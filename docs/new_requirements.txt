@@ -1,0 +1,32 @@
+# Core dependencies installed via the explicit PIP commands in Step 1:
+# torch
+# torchvision
+# torch_geometric
+# torch-sparse
+# torch-scatter
+# torch-cluster
+# torch-spline-conv (now part of torch_geometric)
+
+# Documentation Dependencies
+furo
+setuptools
+sphinxcontrib-bibtex
+matplotlib
+sphinx_gallery
+sphinx-autobuild
+sphinx_rtd_theme
+sphinx
+ruamel.yaml
+
+# Data Processing and Scientific Computing
+pandas
+scipy
+scikit-learn
+
+# Probabilistic Programming (Ensure numba is installed before pyro-ppl for optimal performance)
+numba
+pyro-api
+pyro-ppl
+
+# Deep Graph Library (DGL) - Must install compatible version for PyTorch 2.1
+dgl

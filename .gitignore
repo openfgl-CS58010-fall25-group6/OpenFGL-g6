@@ -1,0 +1,16 @@
+# Ignore compiled Python bytecode (anywhere in the project)
+__pycache__/
+*.pyc
+
+# --- Temporary/Generated Data and Outputs ---
+# Ignore the general 'data' folders where large files often reside
+data/
+experiments/data/
+
+# Ignore the specific data root folders used in your configurations
+experiments/your_data_root/
+your_data_root/
+
+# --- User-Specific Output Files (Emine) ---
+# Ignore SLURM job output files
+slurm_job_outputs_barbun/
