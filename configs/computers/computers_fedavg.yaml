@@ -1,0 +1,28 @@
+# Computers + FedAvg (Subgraph-FL, Figure 2b)
+# Metis partitioning as per paper A.7
+
+name: Computers_FedAvg
+dataset: [Computers]
+task: node_cls
+scenario: subgraph_fl
+algorithm: fedavg
+model: [gcn]
+
+# Simulation - Paper uses Metis partitioning for Subgraph-FL
+simulation_mode: subgraph_fl_metis
+num_clients: 10
+
+# Training hyperparameters (from paper A.7)
+num_rounds: 100
+num_epochs: 3  # Subgraph-FL uses 3 local epochs
+batch_size: 128
+lr: 0.01  # 1e-2 for Subgraph-FL
+weight_decay: 0.0005  # 5e-4
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds for reproducibility
+seeds: [42, 123, 456]

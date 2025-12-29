@@ -1,0 +1,27 @@
+# Computers + FGSSL (Subgraph-FL, Figure 2b)
+
+name: Computers_FGSSL
+dataset: [Computers]
+task: node_cls
+scenario: subgraph_fl
+algorithm: fgssl
+model: [gcn]
+
+# Simulation
+simulation_mode: subgraph_fl_metis
+num_clients: 10
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 3
+batch_size: 128
+lr: 0.01
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]

@@ -283,7 +283,7 @@ def mask_tensor_to_idx(tensor):
 import sys
 import torch
 
-def total_size(o):
+def total_size_old(o):
     """Calculate the total memory size of a given object, avoiding infinite recursion.
 
     Args:
@@ -297,9 +297,61 @@ def total_size(o):
     if isinstance(o, torch.Tensor):
         size += o.element_size() * o.numel()
     elif isinstance(o, dict):
-        size += sum(total_size(v) for v in o.values())
+        size += sum(total_size_old(v) for v in o.values())
     elif isinstance(o, Iterable):
-        size += sum(total_size(i) for i in o)
+        size += sum(total_size_old(i) for i in o)
+    return size
+
+def total_size(o, handlers={}, verbose=False, seen=None):
+    """
+    Returns the approximate memory footprint an object and all of its contents.
+    
+    PATCHED: Handles circular references by tracking seen objects.
+    """
+    import sys
+    from itertools import chain
+    from collections.abc import Mapping, Iterable
+    
+    if seen is None:
+        seen = set()
+    
+    # Get object ID to detect circular references
+    obj_id = id(o)
+    
+    # If we've seen this object before, return 0 to avoid infinite recursion
+    if obj_id in seen:
+        return 0
+    
+    # Mark this object as seen
+    seen.add(obj_id)
+    
+    # Rest of the original function logic same as total_size_old
+    dict_handler = lambda d: chain.from_iterable(d.items())
+    all_handlers = {tuple: iter,
+                    list: iter,
+                    dict: dict_handler,
+                    set: iter,
+                    frozenset: iter,
+                   }
+    all_handlers.update(handlers)     # user handlers take precedence
+    
+    try:
+        size = sys.getsizeof(o)
+    except:
+        size = 0
+    
+    if verbose:
+        print(size, type(o), repr(o))
+
+    if isinstance(o, Mapping):
+        size += sum(total_size(v, all_handlers, verbose, seen) for v in o.values())
+        size += sum(total_size(k, all_handlers, verbose, seen) for k in o.keys())
+    elif isinstance(o, Iterable) and not isinstance(o, (str, bytes, bytearray)):
+        try:
+            size += sum(total_size(i, all_handlers, verbose, seen) for i in o)
+        except:
+            pass
+
     return size
 
 

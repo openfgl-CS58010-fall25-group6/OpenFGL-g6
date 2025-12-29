@@ -1,0 +1,27 @@
+# Computers + FGGP (Subgraph-FL, Figure 2b)
+
+name: Computers_FGGP
+dataset: [Computers]
+task: node_cls
+scenario: subgraph_fl
+algorithm: fggp
+model: [gcn]
+
+# Simulation
+simulation_mode: subgraph_fl_metis
+num_clients: 10
+
+# SAFER HYPERPARAMETERS
+num_rounds: 100
+num_epochs: 3
+batch_size: 64        # REDUCED from 128
+lr: 0.001            # REDUCED from 0.01 (IMPORTANT!)
+weight_decay: 0.001   # INCREASED from 0.0005
+dropout: 0.6          # INCREASED from 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]

@@ -32,7 +32,7 @@ def adj_to_symmetric_norm(adj, r):
     return adj_normalized
 
 
-def csr_sparse_dense_matmul(adj, feature):
+def csr_sparse_dense_matmul_backup(adj, feature):
     file_path = osp.abspath(__file__)
     dir_path = osp.split(file_path)[0]
 
@@ -63,6 +63,39 @@ def csr_sparse_dense_matmul(adj, feature):
     ctl_lib.FloatCSRMulDenseOMP(answer, data, indices, indptr, mat, mat_row, mat_col)
 
     return answer.reshape(feature.shape)
+
+def csr_sparse_dense_matmul(adj, x):
+    """
+    Sparse-dense matrix multiplication
+    PATCHED: Use PyTorch instead of custom C library
+    """
+    import torch
+    import numpy as np
+    from torch_sparse import SparseTensor
+    
+    # Convert x to tensor if it's numpy
+    if isinstance(x, np.ndarray):
+        x = torch.FloatTensor(x)
+    
+    # Convert to PyTorch sparse tensor if needed
+    if not isinstance(adj, (torch.Tensor, SparseTensor)):
+        # Assume scipy sparse matrix
+        import scipy.sparse as sp
+        if sp.issparse(adj):
+            adj_coo = adj.tocoo()
+            indices = torch.from_numpy(np.vstack([adj_coo.row, adj_coo.col])).long()
+            values = torch.from_numpy(adj_coo.data).float()
+            adj = torch.sparse_coo_tensor(indices, values, adj_coo.shape)
+    
+    # Move to same device as x
+    if x.is_cuda:
+        adj = adj.cuda()
+    
+    # Perform sparse matrix multiplication
+    if isinstance(adj, SparseTensor):
+        return adj @ x
+    else:
+        return torch.sparse.mm(adj, x)
 
 def cuda_csr_sparse_dense_matmul(adj, feature):
     file_path = osp.abspath(__file__)

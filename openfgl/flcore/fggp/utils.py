@@ -111,7 +111,7 @@ def req_numclust(c, data, req_clust, distance):
     return c_
 
 
-def FINCH(data, initial_rank=None, req_clust=None, distance='cosine', ensure_early_exit=True, verbose=True):
+def FINCH_backup(data, initial_rank=None, req_clust=None, distance='cosine', ensure_early_exit=True, verbose=True):
     """ FINCH clustering algorithm.
     :param data: Input matrix with features in rows.
     :param initial_rank: Nx1 first integer neighbor indices (optional).
@@ -184,6 +184,78 @@ def FINCH(data, initial_rank=None, req_clust=None, distance='cosine', ensure_ear
     return c, num_clust, req_c
 
 
+def FINCH(data, initial_rank=None, req_clust=None, distance='cosine', verbose=True, ensure_early_exit=False):
+    """
+    FINCH clustering algorithm
+    PATCHED: Handle NaN and ensure min_sim is initialized
+    """
+    import numpy as np
+    
+    # Fix NaN values AND ensure data is valid
+    if np.isnan(data).any() or np.isinf(data).any():
+        if verbose:
+            print("Warning: Replacing NaN/Inf prototypes with zeros")
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    # Ensure non-zero data
+    if np.all(data == 0):
+        if verbose:
+            print("Warning: All-zero prototypes, using random initialization")
+        data = np.random.randn(*data.shape) * 0.01
+    
+    # ORIGINAL CODE CONTINUES HERE
+    adj, orig_dist = clust_rank(data, initial_rank, distance)
+    
+    # Initialize min_sim
+    min_sim = np.min(orig_dist[orig_dist > 0]) if np.any(orig_dist > 0) else 0.0
+    
+    # ensure_early_exit is now a parameter (no need to set it again)
+    
+    initial_rank = None
+    group, num_clust = get_clust(adj, orig_dist, min_sim)
+    c, mat = get_merge([], group, data)
+
+    if verbose:
+        print('Partition 0: {} clusters'.format(num_clust))
+
+    if ensure_early_exit:
+        if orig_dist.shape[-1] > 2:
+            min_sim = np.max(orig_dist * adj.toarray())
+
+    exit_clust = 2
+    c_ = c
+    k = 1
+    num_clust = [num_clust]
+
+    while exit_clust > 1:
+        adj, orig_dist = clust_rank(mat, initial_rank, distance)
+        u, num_clust_curr = get_clust(adj, orig_dist, min_sim)
+        c_, mat = get_merge(c_, u, data)
+
+        num_clust.append(num_clust_curr)
+        c = np.column_stack((c, c_))
+        exit_clust = num_clust[-2] - num_clust_curr
+
+        if num_clust_curr == 1 or exit_clust < 1:
+            num_clust = num_clust[:-1]
+            c = c[:, :-1]
+            break
+
+        if verbose:
+            print('Partition {}: {} clusters'.format(k, num_clust[k]))
+        k += 1
+
+    if req_clust is not None:
+        if req_clust not in num_clust:
+            ind = [i for i, v in enumerate(num_clust) if v >= req_clust]
+            req_c = req_numclust(c[:, ind[-1]], data, req_clust, distance)
+        else:
+            req_c = c[:, num_clust.index(req_clust)]
+    else:
+        req_c = None
+
+    return c, num_clust, req_c
+
 import torch
 import torch.nn.functional as F
 
@@ -214,13 +286,82 @@ def proto_align_loss(proto1, proto2, num_classes, temperature=0.5):
 
     return loss.mean()
 
-def get_proto_norm_weighted(num_classes, embedding, class_label, weight,unique_labels):
+def get_proto_norm_weighted_backup(num_classes, embedding, class_label, weight,unique_labels):
     m1= F.one_hot(class_label, num_classes=num_classes)
     m2 = (m1 * weight[:, None]).t()
     m = m2 / (m2.sum(dim=1, keepdim=True)+ 1e-6)
     m = m[unique_labels]
     return torch.mm(m, embedding)
 
+def get_proto_norm_weighted(num_classes, embedding, pseudo_labels, confidences, unique_labels):
+    """
+    Get normalized weighted prototypes
+    PATCHED: Safe normalization to prevent NaN
+    
+    Args:
+        num_classes: Total number of classes
+        embedding: Node embeddings
+        pseudo_labels: Predicted labels for each node
+        confidences: Confidence scores for predictions
+        unique_labels: Unique labels present in pseudo_labels
+    """
+    import numpy as np
+    import torch
+    
+    # Convert to numpy if needed
+    if isinstance(embedding, torch.Tensor):
+        embedding = embedding.detach().cpu().numpy()
+    if isinstance(pseudo_labels, torch.Tensor):
+        pseudo_labels = pseudo_labels.detach().cpu().numpy()
+    if isinstance(confidences, torch.Tensor):
+        confidences = confidences.detach().cpu().numpy()
+    if isinstance(unique_labels, torch.Tensor):
+        unique_labels = unique_labels.detach().cpu().numpy()
+    
+    proto_dim = embedding.shape[1]
+    
+    # Initialize prototype list for all classes
+    proto_list = np.zeros((num_classes, proto_dim))
+    
+    # Compute weighted prototypes for each unique label
+    for label in unique_labels:
+        if label >= num_classes:
+            continue
+        mask = (pseudo_labels == label)
+        class_embeddings = embedding[mask]
+        class_confidences = confidences[mask]
+        
+        if len(class_embeddings) > 0 and class_confidences.sum() > 0:
+            # Weighted average
+            proto_list[label] = np.average(class_embeddings, axis=0, weights=class_confidences)
+        elif len(class_embeddings) > 0:
+            # Simple average if no valid weights
+            proto_list[label] = class_embeddings.mean(axis=0)
+    
+    # SAFETY CHECKS
+    
+    # 1. Replace NaN/Inf with zeros
+    proto_list = np.nan_to_num(proto_list, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    # 2. Compute norms safely
+    norms = np.linalg.norm(proto_list, axis=1, keepdims=True)
+    
+    # 3. Avoid division by zero or very small numbers
+    norms = np.where(norms < 1e-8, 1.0, norms)
+    
+    # 4. Normalize
+    proto_list = proto_list / norms
+    
+    # 5. Final NaN check after normalization
+    proto_list = np.nan_to_num(proto_list, nan=0.0)
+    
+    # 6. If prototypes are still all zeros, use small random values
+    if np.all(np.abs(proto_list) < 1e-10):
+        print("Warning: All-zero prototypes after normalization. Using random initialization.")
+        proto_list = np.random.randn(num_classes, proto_dim) * 0.01
+    
+    # Convert back to torch tensor
+    return torch.from_numpy(proto_list).float()
 
 import torch
 

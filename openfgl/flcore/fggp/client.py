@@ -82,7 +82,7 @@ class FGGPClient(BaseClient):
 
 
 
-    def execute(self):
+    def execute_backup(self):
         """
         Executes the local training process. This involves:
         - Synchronizing the local and global model parameters with the server.
@@ -99,6 +99,16 @@ class FGGPClient(BaseClient):
 
         self.global_model.eval()
         globel_emb, _ = self.global_model(self.task.data)
+
+        # ADD NaN CHECK:
+        globel_emb_cpu = globel_emb.detach().cpu()
+        
+        # Check for NaN/Inf and fix
+        if torch.isnan(globel_emb_cpu).any() or torch.isinf(globel_emb_cpu).any():
+            print(f"Warning: Client {self.client_id} has NaN/Inf embeddings. Reinitializing.")
+            # Replace with small random values
+            globel_emb_cpu = torch.randn_like(globel_emb_cpu) * 0.01
+
         adj = kneighbors_graph(globel_emb.detach().cpu(), config['neibor_num'], metric='cosine')
         del globel_emb, _
         adj.setdiag(1)
@@ -121,6 +131,55 @@ class FGGPClient(BaseClient):
             self.device)
         self.data2.norm_w = norm_w
         self.data2.pos_weight = pos_weight
+
+        self.task.train()
+
+    def execute(self):
+        """
+        Executes the local training process.
+        """
+        with torch.no_grad():
+            for (local_param, g_p,global_param) in zip(self.task.model.parameters(), self.global_model.parameters(),self.message_pool["server"]["weight"]):
+                local_param.data.copy_(global_param)
+                g_p.data.copy_(global_param)
+
+        self.task.loss_fn = self.get_custom_loss_fn()
+
+        self.global_model.eval()
+        globel_emb, _ = self.global_model(self.task.data)
+        
+        # ADD NaN CHECK:
+        globel_emb_cpu = globel_emb.detach().cpu()
+        
+        # Check for NaN/Inf and fix
+        if torch.isnan(globel_emb_cpu).any() or torch.isinf(globel_emb_cpu).any():
+            print(f"Warning: Client {self.client_id} has NaN/Inf embeddings. Reinitializing.")
+            globel_emb_cpu = torch.randn_like(globel_emb_cpu) * 0.01
+
+        adj = kneighbors_graph(globel_emb_cpu, config['neibor_num'], metric='cosine')  # FIXED: use globel_emb_cpu
+        del globel_emb, _
+        adj.setdiag(1)
+        coo = adj.tocoo()
+        self.task.data.global_edge_index = torch.tensor([coo.row, coo.col], dtype=torch.long).to(self.device)
+        del coo
+        del adj
+        combined_edge_index = torch.cat([self.task.data.edge_index, self.task.data.global_edge_index], dim=1)
+        edge_set = set(zip(combined_edge_index[0].cpu().tolist(), combined_edge_index[1].cpu().tolist()))
+        union_edge_index = torch.tensor([[i[0] for i in edge_set], [i[1] for i in edge_set]], dtype=torch.long)
+
+        self.data2 = self.task.splitted_data["data"].clone()
+
+        self.data2.edge_index = union_edge_index
+        self.data2 = get_norm_and_orig(self.data2)
+        adj_orig = self.data2.adj_orig
+        norm_w = adj_orig.shape[0] ** 2 / float((adj_orig.shape[0] ** 2 - adj_orig.sum()) * 2)
+        pos_weight = torch.FloatTensor([float(adj_orig.shape[0] ** 2 - adj_orig.sum()) / adj_orig.sum()]).to(
+            self.device)
+        self.data2.norm_w = norm_w
+        self.data2.pos_weight = pos_weight
+        
+        # ADD: Set gradient clipping before training
+        self.task.grad_clip_norm = 1.0  # Add gradient clipping parameter
 
         self.task.train()
 
