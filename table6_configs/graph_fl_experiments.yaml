@@ -1,0 +1,9 @@
+include:
+  - datasets.yaml
+  - local.yaml
+  - fl.yaml
+  - fgl.yaml
+
+experiment:
+  seeds: [0, 1, 2, 3, 4]  # For ± std like in Table 6
+  output_dir: results/graph_fl/

@@ -1,0 +1,16 @@
+fl:
+  algorithms:
+    - FedAvg
+    - FedProx
+    - Scaffold
+    - MOON
+    - FedProto
+    - FedNH
+    - FedTGP
+  model: GIN
+
+  common:
+    num_clients: 5
+    rounds: 50
+    local_steps: 1
+    batch_size: 32
