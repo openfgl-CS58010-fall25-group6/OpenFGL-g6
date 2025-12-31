@@ -1,0 +1,31 @@
+# BZR + FedStar (Graph-FL)
+
+name: BZR_FedStar
+dataset: [BZR]
+task: graph_cls
+scenario: graph_fl
+algorithm: fedstar
+model: [gin]
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 89.1±1.5%

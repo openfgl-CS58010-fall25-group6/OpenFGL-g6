@@ -1,0 +1,30 @@
+# DD + Edge-Local (EdgePooling - No Federation)
+name: DD_Edge_Local
+dataset: [DD]
+task: graph_cls
+scenario: graph_fl
+algorithm: isolate
+model: [global_edge]
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 81.5±2.4%

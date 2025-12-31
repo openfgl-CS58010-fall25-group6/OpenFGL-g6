@@ -1,0 +1,28 @@
+# PROTEINS + FedNH (Graph-FL, Figure 2a)
+
+name: PROTEINS_FedNH
+dataset: [PROTEINS]
+task: graph_cls
+scenario: graph_fl
+algorithm: fednh
+model: [gin]
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]

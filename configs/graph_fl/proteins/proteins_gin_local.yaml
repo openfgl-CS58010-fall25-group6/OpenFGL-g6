@@ -1,0 +1,33 @@
+# PROTEINS + GIN-Local (No Federation - Baseline)
+# Local training only - each client trains independently with GIN + global_add_pool
+
+name: PROTEINS_GIN_Local
+dataset: [PROTEINS]
+task: graph_cls
+scenario: graph_fl
+algorithm: isolate  # "isolate" = no federation in OpenFGL
+model: [gin]  # GIN with global_add_pool (mean pooling)
+
+# Simulation (data distribution across clients)
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100  # 100 local epochs total
+num_epochs: 1    # 1 epoch per "round"
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+evaluation_mode: local_model_on_local_data
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 81.8±1.1%

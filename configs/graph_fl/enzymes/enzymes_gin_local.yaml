@@ -1,0 +1,31 @@
+# ENZYMES + GIN-Local (No Federation - Baseline)
+name: ENZYMES_GIN_Local
+dataset: [ENZYMES]
+task: graph_cls
+scenario: graph_fl
+algorithm: isolate
+model: [gin]
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+evaluation_mode: local_model_on_local_data
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 40.7±1.1%
