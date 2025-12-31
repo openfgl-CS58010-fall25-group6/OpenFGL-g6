@@ -1,0 +1,34 @@
+# BZR + GIN-Local (No Federation - Baseline)
+# Local training only - each client trains independently with GIN + global_add_pool
+
+name: BZR_GIN_Local
+dataset: [BZR]
+task: graph_cls
+scenario: graph_fl
+algorithm: isolate  # No federation
+model: [gin]  # GIN with global_add_pool (mean pooling)
+
+# Simulation (data distribution across clients)
+# BZR has 405 graphs, using 10 clients (40 graphs per client)
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters (from paper Appendix A.7)
+num_rounds: 100  # 100 local epochs total
+num_epochs: 1    # 1 epoch per "round"
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+evaluation_mode: local_model_on_local_data
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 84.3±1.6%

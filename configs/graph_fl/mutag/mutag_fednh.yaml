@@ -1,0 +1,34 @@
+# MUTAG + FedNH (Graph-FL)
+# NOTE: FedNH is not implemented for Graph-FL in OpenFGL codebase
+# This config is for documentation only - DO NOT RUN
+
+name: MUTAG_FedNH
+dataset: [MUTAG]
+task: graph_cls
+scenario: graph_fl
+algorithm: fednh  # NOT IMPLEMENTED - will fail
+model: [gin]
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+num_clients: 5
+dirichlet_alpha: 1.0
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+num_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]
+
+# Expected result from Table 6: 84.3±2.2%
+# WARNING: Cannot reproduce - algorithm not implemented

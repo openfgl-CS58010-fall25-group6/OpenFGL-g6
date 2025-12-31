@@ -1,0 +1,29 @@
+# Configuration for PROTEINS dataset with FedAvg algorithm
+# Graph-FL scenario
+
+name: PROTEINS_FedAvg
+dataset: [PROTEINS]
+task: graph_cls
+scenario: graph_fl
+algorithm: fedavg
+model: [gin]
+
+# Simulation settings
+simulation_mode: graph_fl_label_skew
+num_clients: 10
+skew_alpha: 1.0
+
+# Training hyperparameters
+num_rounds: 100
+local_epochs: 1  # or use 'num_epochs: 1'
+batch_size: 128
+lr: 0.001  # 1e-3
+weight_decay: 0.0005  # 5e-4
+dropout: 0.5
+optim: adam
+
+# Evaluation
+metrics: [accuracy]
+
+# Seeds
+seeds: [42, 123, 456]
