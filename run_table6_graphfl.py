@@ -46,18 +46,23 @@ class SweepDefaults:
     task: str = "graph_cls"
     scenario: str = "graph_fl"
 
-    # A reasonable default for Graph-FL; override with CLI.
-    simulation_mode: str = "graph_fl_topology_skew"
+    # === UPDATED TO MATCH APPENDIX A.7 ===
+    # Paper uses Label Distribution Skew with Dirichlet α=1
+    simulation_mode: str = "graph_fl_label_skew"  # Changed from topology_skew!
 
-    # Common training defaults when not provided in table6_configs.
-    lr: float = 1e-3
-    weight_decay: float = 5e-4
-    dropout: float = 0.5
-    optim: str = "adam"
+    # Graph-FL training defaults
+    lr: float = 1e-3           # Paper: 1e-3
+    weight_decay: float = 5e-4  # Paper: 5e-4
+    dropout: float = 0.5        # Paper: 0.5
+    optim: str = "adam"         # Paper: Adam
+    batch_size: int = 128       # Paper: 128 (was 32!)
+    num_rounds: int = 100       # Paper: 100 (was 50!)
+    local_epochs: int = 1       # Paper: 1 epoch per round
+    num_clients: int = 10       # Paper: 10-client (was 5!)
 
-    # Label-skew related defaults
-    skew_alpha: float = 1.0
-    dirichlet_alpha: float = 10.0
+    # Label-skew related defaults - IMPORTANT!
+    skew_alpha: float = 1.0       # Paper: α=1 for Dirichlet
+    dirichlet_alpha: float = 1.0  # Paper: α=1 (was 10.0!)
 
 
 _ALGO_NAME_MAP = {
@@ -90,14 +95,6 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected dict YAML at {path}, got {type(loaded).__name__}")
     return loaded
-
-
-def _normalize_simulation_mode(simulation_mode: str) -> str:
-    # User said "graph_fl"; in OpenFGL code this corresponds to a *scenario*,
-    # while `simulation_mode` must be one of graph_fl_*.
-    if simulation_mode == "graph_fl":
-        return "graph_fl_topology_skew"
-    return simulation_mode
 
 
 def _to_openfgl_algorithm(name: str) -> str:
@@ -244,14 +241,14 @@ def _iter_table6_experiments(
 
                     # Common hyperparams from table6 (with CLI overrides)
                     num_clients = int(overrides.get("num_clients", group_common.get("num_clients", 5)))
-                    num_rounds = int(overrides.get("num_rounds", group_common.get("rounds", 50)))
-                    local_epochs = int(overrides.get("local_epochs", group_common.get("local_steps", 1)))
-                    batch_size = int(overrides.get("batch_size", group_common.get("batch_size", 32)))
+                    num_rounds = int(overrides.get("num_rounds", group_common.get("rounds", defaults.num_rounds)))  # 100
+                    local_epochs = int(overrides.get("local_epochs", group_common.get("local_steps", defaults.local_epochs)))  # 1
+                    batch_size = int(overrides.get("batch_size", group_common.get("batch_size", defaults.batch_size)))  # 128
 
-                    lr = float(overrides.get("lr", group_common.get("lr", defaults.lr)))
-                    weight_decay = float(overrides.get("weight_decay", defaults.weight_decay))
-                    dropout = float(overrides.get("dropout", defaults.dropout))
-                    optim = str(overrides.get("optim", group_common.get("optimizer", defaults.optim)))
+                    lr = float(overrides.get("lr", group_common.get("lr", defaults.lr)))  # 1e-3
+                    weight_decay = float(overrides.get("weight_decay", group_common.get("weight_decay", defaults.weight_decay)))  # 5e-4
+                    dropout = float(overrides.get("dropout", group_common.get("dropout", defaults.dropout)))  # 0.5
+                    optim = str(overrides.get("optim", group_common.get("optimizer", defaults.optim)))  # adam
 
                     dirichlet_alpha = float(overrides.get("dirichlet_alpha", defaults.dirichlet_alpha))
                     skew_alpha = float(overrides.get("skew_alpha", defaults.skew_alpha))
@@ -302,8 +299,7 @@ def main() -> int:
     parser.add_argument(
         "--simulation-mode",
         type=str,
-        default="graph_fl",
-        help="OpenFGL simulation_mode (graph_fl_*). If 'graph_fl', defaults to graph_fl_label_skew.",
+        default="graph_fl_label_skew"
     )
 
     parser.add_argument("--seeds", type=int, nargs="+", default=None, help="Override seeds")
@@ -328,9 +324,9 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parent
     table6_path = (repo_root / args.table6_config).resolve()
+    simulation_mode = args.simulation_mode
 
     defaults = SweepDefaults()
-    simulation_mode = _normalize_simulation_mode(args.simulation_mode)
 
     # Pull seeds from meta-config if not overridden.
     cfg = _load_yaml(table6_path)

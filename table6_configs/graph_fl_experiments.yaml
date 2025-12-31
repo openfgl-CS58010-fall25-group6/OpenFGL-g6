@@ -7,3 +7,13 @@ include:
 experiment:
   seeds: [0, 1, 2, 3, 4]  # For ± std like in Table 6
   output_dir: results/graph_fl/
+
+# Global defaults (can be overridden by group configs)
+defaults:
+  lr: 0.001
+  weight_decay: 0.0005
+  dropout: 0.5
+  batch_size: 128
+  rounds: 100
+  local_steps: 1
+  optimizer: adam
