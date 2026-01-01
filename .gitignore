@@ -14,3 +14,14 @@ your_data_root/
 # --- User-Specific Output Files (Emine) ---
 # Ignore SLURM job output files
 slurm_job_outputs_barbun/
+
+# --- Model and Log Files ---
+*.pkl
+*.pt
+*.pth
+*.ckpt
+*.out
+logs/
+logs_*/
+logs_reproduce/
+slurm_job_outputs_gpu/
