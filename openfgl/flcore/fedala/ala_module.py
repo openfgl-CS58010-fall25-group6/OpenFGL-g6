@@ -1,7 +1,7 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import copy
-import numpy as np
 
 class ALA:
     def __init__(self,
@@ -10,15 +10,28 @@ class ALA:
                  device,
                  batch_size=32,
                  rand_percent=80,
-                 layer_idx=0,
+                 layer_idx=1,
                  eta=1.0,
                  threshold=0.1,
                  num_pre_loss=10):
         """
         FedALA Module for OpenFGL.
+        Aligned with official FedALA implementation (https://github.com/TsingZ0/FedALA).
+        
+        Args:
+            client_id: Client ID.
+            task: The OpenFGL task object containing model and data.
+            device: Using cuda or cpu.
+            batch_size: Weight learning batch size.
+            rand_percent: The percent of the local training data to sample.
+            layer_idx: Control the weight range. layer_idx=1 means adapt only last layer. 
+                       layer_idx=0 means adapt all layers. Default: 1
+            eta: Weight learning rate. Default: 1.0
+            threshold: Train the weight until the std of recorded losses < threshold. Default: 0.1
+            num_pre_loss: Number of recorded losses for std calculation. Default: 10
         """
         self.cid = client_id
-        self.task = task 
+        self.task = task
         self.device = device
         self.batch_size = batch_size
         self.rand_percent = rand_percent
@@ -26,67 +39,92 @@ class ALA:
         self.eta = eta
         self.threshold = threshold
         self.num_pre_loss = num_pre_loss
-        
-        self.weights = None 
+
+        self.weights = None  # Learnable local aggregation weights
         self.start_phase = True
 
     def adaptive_local_aggregation(self, global_model_params):
+        """
+        Adaptive local aggregation following official FedALA implementation.
+        
+        Args:
+            global_model_params: The received global model parameters (list or dict).
+        """
+        # Obtain the references of the parameters
         if isinstance(global_model_params, dict):
             params_g = list(global_model_params.values())
         elif isinstance(global_model_params, list):
             params_g = global_model_params
         else:
             params_g = list(global_model_params.parameters())
-        
-        params_l = list(self.task.model.parameters())
 
-        # Initialize weights if first round
-        if self.weights is None:
-            self.weights = [torch.ones_like(p).to(self.device) for p in params_l]
+        params = list(self.task.model.parameters())
 
-        # Create Temp Model
-        model_t = copy.deepcopy(self.task.model)
-        model_t.to(self.device)
-        
-        # Freeze temp model parameters (we only train 'weights')
-        for param in model_t.parameters():
-            param.requires_grad = False
+        # Deactivate ALA at the 1st communication iteration (when global == local)
+        if torch.sum(params_g[0].data - params[0].data) == 0:
+            return
 
-        # --- Get the correct DataLoader from task ---
-        # Graph-FL uses train_dataloader (not train_loader)
+        # Get data loader
         if hasattr(self.task, 'train_dataloader') and self.task.train_dataloader is not None:
-            loader = self.task.train_dataloader
+            rand_loader = self.task.train_dataloader
         elif hasattr(self.task, 'processed_data') and self.task.processed_data is not None:
-            loader = self.task.processed_data.get('train_dataloader')
+            rand_loader = self.task.processed_data.get('train_dataloader')
         elif hasattr(self.task, 'splitted_data') and self.task.splitted_data is not None:
-            loader = self.task.splitted_data.get('train_dataloader')
+            rand_loader = self.task.splitted_data.get('train_dataloader')
         else:
             raise ValueError("ALA: No data loader found.")
 
-        model_t.eval()
-        losses = []
-        cnt = 0
-        
+        # Handle layer_idx logic (official implementation uses negative indexing)
+        if self.layer_idx == 0:
+            # Adapt all layers
+            params_p = params
+            params_gp = params_g
+        else:
+            # Preserve all the updates in the lower layers (copy global to local)
+            for param, param_g in zip(params[:-self.layer_idx], params_g[:-self.layer_idx]):
+                param.data = param_g.data.clone()
+
+            # Only consider higher layers for ALA
+            params_p = params[-self.layer_idx:]
+            params_gp = params_g[-self.layer_idx:]
+
+        # Temp local model only for weight learning
+        model_t = copy.deepcopy(self.task.model)
+        model_t.to(self.device)
+        params_t = list(model_t.parameters())
+
+        # Get higher layer params from temp model
+        if self.layer_idx == 0:
+            params_tp = params_t
+        else:
+            params_tp = params_t[-self.layer_idx:]
+            # Freeze the lower layers to reduce computational cost
+            for param in params_t[:-self.layer_idx]:
+                param.requires_grad = False
+
+        # Used to obtain the gradient of higher layers
+        # No need to use optimizer.step(), so lr=0
+        optimizer = torch.optim.SGD(params_tp, lr=0)
+
+        # Initialize the weight to all ones in the beginning
+        if self.weights is None:
+            self.weights = [torch.ones_like(param.data).to(self.device) for param in params_p]
+
+        # Initialize the higher layers in the temp local model
+        for param_t, param, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
+            param_t.data = param.data + (param_g.data - param.data) * weight
+
+        # Weight learning
+        losses = []  # Record losses
+        cnt = 0  # Weight training iteration counter
+
         while True:
-            for batch in loader:
-                # Batch from DataLoader is already a PyG Batch object
-                # Move to device (this should work for Batch objects)
+            for batch in rand_loader:
                 batch = batch.to(self.device)
                 
-                # 1. Initialize Temp Model: params_t = params_l + (params_g - params_l) * w
-                params_tp = list(model_t.parameters())
+                optimizer.zero_grad()
                 
-                with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
-                        param_t.data = param_l.data + (param_g.data - param_l.data) * weight
-
-                # 2. Enable gradients for temp model
-                for param in model_t.parameters():
-                    param.requires_grad = True
-                    if param.grad is not None:
-                        param.grad.zero_()
-
-                # 3. Forward - OpenFGL models return (embedding, logits)
+                # Forward pass - OpenFGL models return (embedding, logits)
                 output = model_t(batch)
                 if isinstance(output, tuple):
                     embedding, logits = output
@@ -94,47 +132,42 @@ class ALA:
                     logits = output
                     embedding = None
 
-                # 4. Loss - use task's loss function or default cross entropy
+                # Compute loss
                 if hasattr(self.task, 'loss_fn') and embedding is not None:
-                    loss = self.task.loss_fn(embedding, logits, batch.y, torch.ones_like(batch.y).bool())
+                    loss_value = self.task.loss_fn(embedding, logits, batch.y, torch.ones_like(batch.y).bool())
                 else:
-                    loss = nn.functional.cross_entropy(logits, batch.y)
+                    loss_value = nn.functional.cross_entropy(logits, batch.y)
 
-                # 5. Backward
-                loss.backward()
+                loss_value.backward()
 
-                # 6. Update Weights
-                with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
-                        if param_t.grad is not None:
-                            grad_weight = param_t.grad * (param_g.data - param_l.data)
-                            weight.data = torch.clamp(weight.data - self.eta * grad_weight, 0, 1)
+                # Update weight in this batch
+                for param_t, param, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
+                    if param_t.grad is not None:
+                        weight.data = torch.clamp(
+                            weight - self.eta * (param_t.grad * (param_g.data - param.data)), 0, 1)
 
-                    for param in model_t.parameters():
-                        param.requires_grad = False
-                
-                # 7. Update Temp Model
-                with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
-                        param_t.data = param_l.data + (param_g.data - param_l.data) * weight
+                # Update temp local model in this batch
+                for param_t, param, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
+                    param_t.data = param.data + (param_g.data - param.data) * weight
 
-            # --- Loop Control ---
-            losses.append(loss.item())
+            losses.append(loss_value.item())
             cnt += 1
 
+            # Only train one epoch in the subsequent iterations
             if not self.start_phase:
                 break
-            
+
+            # Train the weight until convergence
             if len(losses) > self.num_pre_loss and np.std(losses[-self.num_pre_loss:]) < self.threshold:
-                print(f'Client {self.cid} ALA converged at epoch {cnt}')
+                print(f'Client {self.cid}: Std={np.std(losses[-self.num_pre_loss:]):.4f}, ALA epochs={cnt}')
                 break
-            
-            if cnt > 50: 
+
+            # Safety break
+            if cnt > 50:
                 break
 
         self.start_phase = False
 
-        # 8. Apply Final Learned Weights to REAL Local Model
-        with torch.no_grad():
-            for param_l, param_g, weight in zip(params_l, params_g, self.weights):
-                param_l.data = param_l.data + (param_g.data - param_l.data) * weight
+        # Obtain initialized local model (apply learned weights)
+        for param, param_t in zip(params_p, params_tp):
+            param.data = param_t.data.clone()
