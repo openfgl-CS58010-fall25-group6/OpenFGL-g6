@@ -13,4 +13,9 @@ your_data_root/
 
 # --- User-Specific Output Files (Emine) ---
 # Ignore SLURM job output files
-slurm_job_outputs_barbun/
+slurm_job_outputs_barbun/dataset/distrib/
+data/
+*.DS_Store
+logs_reproduce/
+dataset/
+**/.DS_Store

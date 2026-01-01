@@ -17,7 +17,7 @@ class FedALAClient(BaseClient):
         # args should contain hyperparameters like eta, rand_percent, layer_idx
         self.eta = getattr(args, 'eta', 1.0)
         self.rand_percent = getattr(args, 'rand_percent', 80)
-        self.layer_idx = getattr(args, 'layer_idx', 0) # 0 means adapt all layers
+        self.layer_idx = getattr(args, 'layer_idx', 1) # 0 means adapt all layers
         
         self.threshold = getattr(args, 'threshold', 0.1)    
         self.num_pre_loss = getattr(args, 'num_pre_loss', 10) 

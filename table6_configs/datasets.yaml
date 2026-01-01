@@ -1,0 +1,10 @@
+datasets:
+  - MUTAG
+  - BZR
+  - COX2
+  - ENZYMES
+  - DD
+  - PROTEINS
+  - COLLAB
+  - IMDB-BINARY
+  - IMDB-MULTI

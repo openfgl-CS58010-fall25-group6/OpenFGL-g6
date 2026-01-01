@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import copy
 import numpy as np
-from torch.utils.data import DataLoader
 
 class ALA:
     def __init__(self,
@@ -17,7 +16,6 @@ class ALA:
                  num_pre_loss=10):
         """
         FedALA Module for OpenFGL.
-        Strictly aligned with official implementation (ALA.py) but patched for GCN/Subgraph.
         """
         self.cid = client_id
         self.task = task 
@@ -38,8 +36,8 @@ class ALA:
         elif isinstance(global_model_params, list):
             params_g = global_model_params
         else:
-            # Fallback if it's a model object
             params_g = list(global_model_params.parameters())
+        
         params_l = list(self.task.model.parameters())
 
         # Initialize weights if first round
@@ -48,18 +46,22 @@ class ALA:
 
         # Create Temp Model
         model_t = copy.deepcopy(self.task.model)
+        model_t.to(self.device)
         
         # Freeze temp model parameters (we only train 'weights')
         for param in model_t.parameters():
             param.requires_grad = False
 
-        # --- Data Loading (Handle Subgraph vs Graph) ---
-        if hasattr(self.task, 'train_loader') and self.task.train_loader is not None:
-            loader = self.task.train_loader # Graph-FL
-        elif hasattr(self.task, 'data'):
-             loader = [self.task.data]      # Subgraph-FL
+        # --- Get the correct DataLoader from task ---
+        # Graph-FL uses train_dataloader (not train_loader)
+        if hasattr(self.task, 'train_dataloader') and self.task.train_dataloader is not None:
+            loader = self.task.train_dataloader
+        elif hasattr(self.task, 'processed_data') and self.task.processed_data is not None:
+            loader = self.task.processed_data.get('train_dataloader')
+        elif hasattr(self.task, 'splitted_data') and self.task.splitted_data is not None:
+            loader = self.task.splitted_data.get('train_dataloader')
         else:
-             raise ValueError("ALA: No data found.")
+            raise ValueError("ALA: No data loader found.")
 
         model_t.eval()
         losses = []
@@ -67,73 +69,62 @@ class ALA:
         
         while True:
             for batch in loader:
+                # Batch from DataLoader is already a PyG Batch object
+                # Move to device (this should work for Batch objects)
                 batch = batch.to(self.device)
                 
                 # 1. Initialize Temp Model: params_t = params_l + (params_g - params_l) * w
                 params_tp = list(model_t.parameters())
-                params_p = params_l
-                params_gp = params_g
                 
                 with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
+                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
                         param_t.data = param_l.data + (param_g.data - param_l.data) * weight
 
-                # 2. Get Gradients (Manual Zero Grad)
+                # 2. Enable gradients for temp model
                 for param in model_t.parameters():
                     param.requires_grad = True
                     if param.grad is not None:
                         param.grad.zero_()
 
-                # 3. Forward (Patched for GCN)
-                if hasattr(batch, 'edge_index'):
-                     output = model_t(batch.x, batch.edge_index)
+                # 3. Forward - OpenFGL models return (embedding, logits)
+                output = model_t(batch)
+                if isinstance(output, tuple):
+                    embedding, logits = output
                 else:
-                     output = model_t(batch)
-                
-                if isinstance(output, tuple): output = output[0]
+                    logits = output
+                    embedding = None
 
-                # 4. Loss (Patched for Subgraph Mask)
-                if hasattr(batch, 'train_mask') and batch.train_mask is not None:
-                    loss = nn.functional.cross_entropy(output[batch.train_mask], batch.y[batch.train_mask])
-                elif hasattr(self.task, 'criterion'):
-                    loss = self.task.criterion(output, batch.y)
+                # 4. Loss - use task's loss function or default cross entropy
+                if hasattr(self.task, 'loss_fn') and embedding is not None:
+                    loss = self.task.loss_fn(embedding, logits, batch.y, torch.ones_like(batch.y).bool())
                 else:
-                    if batch.y.is_floating_point():
-                         loss = nn.functional.binary_cross_entropy_with_logits(output, batch.y)
-                    else:
-                         loss = nn.functional.cross_entropy(output, batch.y)
+                    loss = nn.functional.cross_entropy(logits, batch.y)
 
                 # 5. Backward
                 loss.backward()
 
-                # 6. Update Weights (Strict Official Logic)
-                # Formula: w_new = w - eta * grad_w
-                # Chain rule: grad_w = grad_param_t * (param_g - param_l)
+                # 6. Update Weights
                 with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
+                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
                         if param_t.grad is not None:
                             grad_weight = param_t.grad * (param_g.data - param_l.data)
                             weight.data = torch.clamp(weight.data - self.eta * grad_weight, 0, 1)
 
-                    # Reset temp model grads
                     for param in model_t.parameters():
                         param.requires_grad = False
                 
-                # 7. Update Temp Model IMMEDIATELY (Official ALA.py logic)
-                # The official code updates the temp model inside the batch loop
+                # 7. Update Temp Model
                 with torch.no_grad():
-                    for param_t, param_l, param_g, weight in zip(params_tp, params_p, params_gp, self.weights):
-                         param_t.data = param_l.data + (param_g.data - param_l.data) * weight
+                    for param_t, param_l, param_g, weight in zip(params_tp, params_l, params_g, self.weights):
+                        param_t.data = param_l.data + (param_g.data - param_l.data) * weight
 
-            # --- Loop Control (Strict Official Logic) ---
+            # --- Loop Control ---
             losses.append(loss.item())
             cnt += 1
 
-            # "only train one epoch in the subsequent iterations" (from official ALA.py)
             if not self.start_phase:
                 break
             
-            # Start Phase Convergence
             if len(losses) > self.num_pre_loss and np.std(losses[-self.num_pre_loss:]) < self.threshold:
                 print(f'Client {self.cid} ALA converged at epoch {cnt}')
                 break
@@ -145,5 +136,5 @@ class ALA:
 
         # 8. Apply Final Learned Weights to REAL Local Model
         with torch.no_grad():
-             for param_l, param_g, weight in zip(params_l, params_g, self.weights):
+            for param_l, param_g, weight in zip(params_l, params_g, self.weights):
                 param_l.data = param_l.data + (param_g.data - param_l.data) * weight

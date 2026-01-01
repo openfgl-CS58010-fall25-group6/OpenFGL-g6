@@ -110,7 +110,7 @@ parser.add_argument("--comm_cost", type=bool, default=False)
 parser.add_argument("--model_param", type=bool, default=False)
 
 parser.add_argument("--eta", type=float, default=1.0, help="Learning rate for ALA weights")
-parser.add_argument("--layer_idx", type=int, default=0, help="Number of lower layers to freeze in ALA (0 = adapt all)")
+parser.add_argument("--layer_idx", type=int, default=1, help="Number of lower layers to freeze in ALA (0 = adapt all)")
 parser.add_argument("--rand_percent", type=int, default=80, help="Percentage of data for ALA")
 
 args, unknown = parser.parse_known_args()

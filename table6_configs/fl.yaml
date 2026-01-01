@@ -1,0 +1,35 @@
+fl:
+  algorithms:
+    - FedAvg
+    - FedProx
+    - Scaffold
+    - MOON
+    - FedProto
+    - FedNH
+    - FedTGP
+    - FedALA
+  model: GIN
+
+  common:
+    num_clients: 5
+    rounds: 100           # Paper uses 100
+    local_steps: 1
+    batch_size: 128       # Paper uses 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam
+
+  # Algorithm-specific hyperparameters
+  algorithm_params:
+    FedProx:
+      mu: 0.01
+    MOON:
+      mu: 0.1
+      temperature: 0.5
+    FedALA:
+      eta: 1.0
+      rand_percent: 80
+      layer_idx: 1
+      threshold: 0.1
+      num_pre_loss: 10
