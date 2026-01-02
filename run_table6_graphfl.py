@@ -140,6 +140,7 @@ def _build_experiment(
     optim: str,
     dirichlet_alpha: float,
     skew_alpha: float,
+    layer_idx: int = None,
     defaults: SweepDefaults,
 ) -> Dict[str, Any]:
     exp: Dict[str, Any] = {
@@ -164,7 +165,8 @@ def _build_experiment(
 
     # Only used by label_skew sims.
     exp["skew_alpha"] = skew_alpha
-
+    if layer_idx is not None:
+        exp["layer_idx"] = layer_idx
     return exp
 
 
@@ -243,7 +245,7 @@ def _iter_table6_experiments(
                     model = _to_openfgl_model(str(model_display))
 
                     # Common hyperparams from table6 (with CLI overrides)
-                    num_clients = int(overrides.get("num_clients", group_common.get("num_clients", 5)))
+                    num_clients = int(overrides.get("num_clients", group_common.get("num_clients", 10)))
                     num_rounds = int(overrides.get("num_rounds", group_common.get("rounds", defaults.num_rounds)))  # 100
                     local_epochs = int(overrides.get("local_epochs", group_common.get("local_steps", defaults.local_epochs)))  # 1
                     batch_size = int(overrides.get("batch_size", group_common.get("batch_size", defaults.batch_size)))  # 128
@@ -255,6 +257,8 @@ def _iter_table6_experiments(
 
                     dirichlet_alpha = float(overrides.get("dirichlet_alpha", defaults.dirichlet_alpha))
                     skew_alpha = float(overrides.get("skew_alpha", defaults.skew_alpha))
+
+                    layer_idx = int(overrides.get("layer_idx")) if overrides.get("layer_idx") is not None else None
 
                     exp_name = f"Table6_{dataset}_{group_name}_{algo}_{model}"
 
@@ -275,6 +279,7 @@ def _iter_table6_experiments(
                             optim=optim,
                             dirichlet_alpha=dirichlet_alpha,
                             skew_alpha=skew_alpha,
+                            layer_idx=layer_idx,
                             defaults=defaults,
                         )
                     )
@@ -332,6 +337,8 @@ def main() -> int:
     parser.add_argument("--threshold", type=float, default=0.1, help="Convergence threshold for ALA")
     parser.add_argument("--num_pre_loss", type=int, default=10, help="Window size for convergence check")
 
+    parser.add_argument("--layer-idx", type=int, default=None, help="FedALA layer_idx param")
+
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent
@@ -370,6 +377,8 @@ def main() -> int:
         overrides["dirichlet_alpha"] = args.dirichlet_alpha
     if args.skew_alpha is not None:
         overrides["skew_alpha"] = args.skew_alpha
+    if args.layer_idx is not None:
+        overrides["layer_idx"] = args.layer_idx
 
     experiments, warnings = _iter_table6_experiments(
         repo_root=repo_root,
@@ -439,6 +448,9 @@ def main() -> int:
                 "lr": exp["lr"],
                 "weight_decay": exp["weight_decay"],
                 "dropout": exp["dropout"],
+
+                # FedALA-specific params
+                "layer_idx": exp.get("layer_idx"),
                 
                 # === PRIMARY RESULTS ===
                 # Test accuracy

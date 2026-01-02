@@ -75,6 +75,9 @@ def run_experiment(exp_config, seed):
     if args.simulation_mode in ["graph_fl_label_skew", "subgraph_fl_label_skew"]:
         args.skew_alpha = exp_config.get("skew_alpha", 1.0)
     
+    if 'layer_idx' in exp_config:
+        args.layer_idx = exp_config['layer_idx']
+        
     # Train
     start_time = time.time()
     trainer = FGLTrainer(args)

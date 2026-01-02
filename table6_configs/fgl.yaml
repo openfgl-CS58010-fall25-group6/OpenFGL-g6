@@ -5,7 +5,7 @@ fgl:
   model: GIN
 
   common:
-    num_clients: 5
+    num_clients: 10
     rounds: 100           # Paper uses 100
     local_steps: 1
     batch_size: 128       # Paper uses 128
