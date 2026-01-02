@@ -61,6 +61,15 @@ def run_experiment(exp_config, seed):
     args.dropout = exp_config['dropout']
     args.optim = exp_config.get('optim', 'adam')
 
+    # # FedALA specific parameters
+    args.eta = exp_config.get('eta', 1.0)
+    args.threshold = exp_config.get('threshold', 0.1)
+    args.num_pre_loss = exp_config.get('num_pre_loss', 10)
+    args.rand_percent = exp_config.get('rand_percent', 80)
+    args.layer_idx = exp_config.get('layer_idx', 1)
+    args.lambda_graph = exp_config.get('lambda_graph', 10)
+    args.graph_reg_type = exp_config.get('graph_reg_type', 'laplacian')
+
     # Eval/metrics
     args.metrics = exp_config.get('metrics', ['accuracy'])
     args.evaluation_mode = exp_config.get('evaluation_mode', args.evaluation_mode)
