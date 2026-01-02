@@ -17,7 +17,13 @@ supported_graph_fl_task = ["graph_cls", "graph_reg"]
 supported_subgraph_fl_task = ["node_cls", "link_pred", "node_clust"]
 
 
-supported_fl_algorithm = ["isolate", "fedavg", "fedprox", "scaffold", "moon", "feddc", "fedproto", "fedtgp", "fedpub", "fedstar", "fedgta", "fedtad", "gcfl_plus", "fedsage_plus", "adafgl", "feddep", "fggp", "fgssl", "fedgl", "fedala"]
+# === UPDATED: Added fedala_plus ===
+supported_fl_algorithm = [
+    "isolate", "fedavg", "fedprox", "scaffold", "moon", "feddc", 
+    "fedproto", "fedtgp", "fedpub", "fedstar", "fedgta", "fedtad", 
+    "gcfl_plus", "fedsage_plus", "adafgl", "feddep", "fggp", "fgssl", 
+    "fedgl", "fedala", "fedala_plus"
+]
 
 
 supported_metrics = ["accuracy", "precision", "f1", "recall", "auc", "ap", "clustering_accuracy", "nmi", "ari"]
@@ -109,8 +115,19 @@ parser.add_argument("--log_name", type=str, default=None)
 parser.add_argument("--comm_cost", type=bool, default=False)
 parser.add_argument("--model_param", type=bool, default=False)
 
+# === FedALA & FedALA+ Hyperparameters ===
+# Original FedALA parameters (you already have these)
 parser.add_argument("--eta", type=float, default=1.0, help="Learning rate for ALA weights")
 parser.add_argument("--layer_idx", type=int, default=1, help="Number of lower layers to freeze in ALA (0 = adapt all)")
 parser.add_argument("--rand_percent", type=int, default=80, help="Percentage of data for ALA")
+
+# === ADDED: Additional FedALA parameters ===
+parser.add_argument("--threshold", type=float, default=0.1, help="Convergence threshold for ALA")
+parser.add_argument("--num_pre_loss", type=int, default=10, help="Window size for convergence check")
+
+# === ADDED: FedALA+ disagreement sampling parameters ===
+parser.add_argument("--use_disagreement", type=bool, default=False, help="Use disagreement-based sampling in FedALA+")
+parser.add_argument("--selection_frequency", type=int, default=1, help="Recompute disagreement every N rounds")
+parser.add_argument("--min_disagreement_samples", type=int, default=None, help="Minimum disagreement samples before fallback to random")
 
 args, unknown = parser.parse_known_args()

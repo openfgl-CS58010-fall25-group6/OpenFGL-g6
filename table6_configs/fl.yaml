@@ -8,6 +8,10 @@ fl:
     - FedNH
     - FedTGP
     - FedALA
+    - FedALA+
+    - FedALARegularized
+    - FedALA+Regularized
+
   model: GIN
 
   common:
@@ -33,3 +37,21 @@ fl:
       layer_idx: 1
       threshold: 0.1
       num_pre_loss: 10
+    FedALA+:
+      eta: 1.0
+      rand_percent: 80
+      layer_idx: 1
+      threshold: 0.1
+      num_pre_loss: 10  
+    FedALARegularized:
+      eta: 1.0
+      rand_percent: 80
+      layer_idx: 1
+      threshold: 0.1
+      num_pre_loss: 10       
+    FedALA+Regularized:
+      eta: 1.0
+      rand_percent: 80
+      layer_idx: 1
+      threshold: 0.1
+      num_pre_loss: 10         

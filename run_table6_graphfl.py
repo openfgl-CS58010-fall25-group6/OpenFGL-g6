@@ -78,6 +78,9 @@ _ALGO_NAME_MAP = {
     "GCFL+": "gcfl_plus",
     "FedSage+": "fedsage_plus",
     "FedALA": "fedala",
+    "FedALA+": "fedala_plus",
+    "FedALARegularized": "fedala_regularized",
+    "FedALA+Regularized": "fedala_plus_regularized",
     # Keep placeholders (may be unsupported in this fork)
     "FedNH": "fednh",
 }
@@ -141,6 +144,15 @@ def _build_experiment(
     dirichlet_alpha: float,
     skew_alpha: float,
     defaults: SweepDefaults,
+    # === NEW: FedALA+ parameters ===
+    eta: float = 1.0,
+    layer_idx: int = 1,
+    rand_percent: int = 80,
+    threshold: float = 0.1,
+    num_pre_loss: int = 10,
+    use_disagreement: bool = False,
+    selection_frequency: int = 1,
+    min_disagreement_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     exp: Dict[str, Any] = {
         "name": name,
@@ -160,10 +172,22 @@ def _build_experiment(
         "optim": optim,
         "metrics": ["accuracy"],
         "dirichlet_alpha": dirichlet_alpha,
+        "skew_alpha": skew_alpha,
     }
 
-    # Only used by label_skew sims.
-    exp["skew_alpha"] = skew_alpha
+    # === NEW: Add FedALA/FedALA+ specific parameters ===
+    if algorithm in ["fedala", "fedala_plus", "fedala_regularized", "fedala_plus_regularized"]:
+        exp["eta"] = eta
+        exp["layer_idx"] = layer_idx
+        exp["rand_percent"] = rand_percent
+        exp["threshold"] = threshold
+        exp["num_pre_loss"] = num_pre_loss
+        
+        # FedALA+ specific (disagreement sampling)
+        if "plus" in algorithm:
+            exp["use_disagreement"] = use_disagreement
+            exp["selection_frequency"] = selection_frequency
+            exp["min_disagreement_samples"] = min_disagreement_samples
 
     return exp
 
@@ -200,6 +224,9 @@ def _iter_table6_experiments(
     fgl_yaml = included.get("fgl.yaml", {}).get("fgl", {})
 
     fedala_yaml = included.get("fedala.yaml", {}).get("fedala", {})
+    fedala_plus_yaml = included.get("fedala_plus.yaml", {}).get("fedala_plus", {})
+    fedala_plus_regularized_yaml = included.get("fedala_plus_regularized.yaml", {}).get("fedala_plus_regularized", {})
+    fedala_regularized_yaml = included.get("fedala_regularized.yaml", {}).get("fedala_regularized", {})
 
     selected_groups = set(only_groups or ["local", "fl", "fgl"])
     if only_groups is not None and not selected_groups:
@@ -242,19 +269,28 @@ def _iter_table6_experiments(
                 for model_display in models:
                     model = _to_openfgl_model(str(model_display))
 
-                    # Common hyperparams from table6 (with CLI overrides)
+                    # Common hyperparams
                     num_clients = int(overrides.get("num_clients", group_common.get("num_clients", 5)))
-                    num_rounds = int(overrides.get("num_rounds", group_common.get("rounds", defaults.num_rounds)))  # 100
-                    local_epochs = int(overrides.get("local_epochs", group_common.get("local_steps", defaults.local_epochs)))  # 1
-                    batch_size = int(overrides.get("batch_size", group_common.get("batch_size", defaults.batch_size)))  # 128
-
-                    lr = float(overrides.get("lr", group_common.get("lr", defaults.lr)))  # 1e-3
-                    weight_decay = float(overrides.get("weight_decay", group_common.get("weight_decay", defaults.weight_decay)))  # 5e-4
-                    dropout = float(overrides.get("dropout", group_common.get("dropout", defaults.dropout)))  # 0.5
-                    optim = str(overrides.get("optim", group_common.get("optimizer", defaults.optim)))  # adam
-
+                    num_rounds = int(overrides.get("num_rounds", group_common.get("rounds", defaults.num_rounds)))
+                    local_epochs = int(overrides.get("local_epochs", group_common.get("local_steps", defaults.local_epochs)))
+                    batch_size = int(overrides.get("batch_size", group_common.get("batch_size", defaults.batch_size)))
+                    lr = float(overrides.get("lr", group_common.get("lr", defaults.lr)))
+                    weight_decay = float(overrides.get("weight_decay", group_common.get("weight_decay", defaults.weight_decay)))
+                    dropout = float(overrides.get("dropout", group_common.get("dropout", defaults.dropout)))
+                    optim = str(overrides.get("optim", group_common.get("optimizer", defaults.optim)))
                     dirichlet_alpha = float(overrides.get("dirichlet_alpha", defaults.dirichlet_alpha))
                     skew_alpha = float(overrides.get("skew_alpha", defaults.skew_alpha))
+
+                    # === NEW: FedALA+ parameters ===
+                    eta = float(overrides.get("eta", group_common.get("eta", 1.0)))
+                    layer_idx = int(overrides.get("layer_idx", group_common.get("layer_idx", 1)))
+                    rand_percent = int(overrides.get("rand_percent", group_common.get("rand_percent", 80)))
+                    threshold = float(overrides.get("threshold", group_common.get("threshold", 0.1)))
+                    num_pre_loss = int(overrides.get("num_pre_loss", group_common.get("num_pre_loss", 10)))
+                    
+                    use_disagreement = bool(overrides.get("use_disagreement", group_common.get("use_disagreement", False)))
+                    selection_frequency = int(overrides.get("selection_frequency", group_common.get("selection_frequency", 1)))
+                    min_disagreement_samples = overrides.get("min_disagreement_samples", group_common.get("min_disagreement_samples"))
 
                     exp_name = f"Table6_{dataset}_{group_name}_{algo}_{model}"
 
@@ -276,6 +312,15 @@ def _iter_table6_experiments(
                             dirichlet_alpha=dirichlet_alpha,
                             skew_alpha=skew_alpha,
                             defaults=defaults,
+                            # === NEW: FedALA+ params ===
+                            eta=eta,
+                            layer_idx=layer_idx,
+                            rand_percent=rand_percent,
+                            threshold=threshold,
+                            num_pre_loss=num_pre_loss,
+                            use_disagreement=use_disagreement,
+                            selection_frequency=selection_frequency,
+                            min_disagreement_samples=min_disagreement_samples,
                         )
                     )
 
@@ -287,6 +332,12 @@ def _iter_table6_experiments(
         add_group("fgl", fgl_yaml)
     if "fedala" in selected_groups:
         add_group("fedala", fedala_yaml)
+    if "fedala_plus" in selected_groups:
+        add_group("fedala_plus", fedala_plus_yaml)
+    if "fedala_regularized" in selected_groups:
+        add_group("fedala_regularized", fedala_regularized_yaml)
+    if "fedala_plus_regularized" in selected_groups:
+        add_group("fedala_plus_regularized", fedala_plus_regularized_yaml)
 
     return experiments, warnings
 
@@ -332,6 +383,12 @@ def main() -> int:
     parser.add_argument("--threshold", type=float, default=0.1, help="Convergence threshold for ALA")
     parser.add_argument("--num_pre_loss", type=int, default=10, help="Window size for convergence check")
 
+    # === NEW: FedALA+ specific ===
+    parser.add_argument("--use-disagreement", action="store_true", default=None, help="Use disagreement-based sampling")
+    parser.add_argument("--no-use-disagreement", dest="use_disagreement", action="store_false", help="Disable disagreement sampling")
+    parser.add_argument("--selection-frequency", type=int, default=None, help="Recompute disagreement every N rounds")
+    parser.add_argument("--min-disagreement-samples", type=int, default=None, help="Minimum disagreement samples before fallback")
+
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent
@@ -370,6 +427,12 @@ def main() -> int:
         overrides["dirichlet_alpha"] = args.dirichlet_alpha
     if args.skew_alpha is not None:
         overrides["skew_alpha"] = args.skew_alpha
+    if args.use_disagreement is not None:
+        overrides["use_disagreement"] = args.use_disagreement
+    if args.selection_frequency is not None:
+        overrides["selection_frequency"] = args.selection_frequency
+    if args.min_disagreement_samples is not None:
+        overrides["min_disagreement_samples"] = args.min_disagreement_samples    
 
     experiments, warnings = _iter_table6_experiments(
         repo_root=repo_root,
@@ -396,8 +459,16 @@ def main() -> int:
     print(f"simulation_mode={simulation_mode}")
 
     if args.dry_run:
+
         for exp in experiments[:50]:
-            print(f"- {exp['name']} | {exp['dataset'][0]} | {exp['algorithm']} | {exp['model'][0]}")
+                extra_params_str = ""
+                if 'rand_percent' in exp:
+                    extra_params_str = f" | s={exp['rand_percent']}%"
+                    if exp.get('use_disagreement'):
+                        extra_params_str += f" disagr=✓"
+                    else:
+                        extra_params_str += f" disagr=✗"
+                print(f"- {exp['name']} | {exp['dataset'][0]} | {exp['algorithm']} | {exp['model'][0]} | {extra_params_str}")
         if len(experiments) > 50:
             print(f"... ({len(experiments) - 50} more)")
         return 0
@@ -439,6 +510,18 @@ def main() -> int:
                 "lr": exp["lr"],
                 "weight_decay": exp["weight_decay"],
                 "dropout": exp["dropout"],
+                    
+                # === NEW: ALA+-specific metrics ===
+                "rand_percent": exp.get("rand_percent"), #sample percent s
+                "use_disagreement": exp.get("use_disagreement"),
+                "selection_frequency": exp.get("selection_frequency"),
+                "min_disagreement_samples": exp.get("min_disagreement_samples"),
+    
+                # ALA+ runtime metrics (if available from result)
+                "mean_selection_time": result.get("mean_selection_time"),
+                "mean_ala_training_time": result.get("mean_ala_training_time"),
+                "cache_hit_rate": result.get("cache_hit_rate"),
+                "fallback_count": result.get("fallback_count"),
                 
                 # === PRIMARY RESULTS ===
                 # Test accuracy
