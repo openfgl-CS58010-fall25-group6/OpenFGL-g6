@@ -1,0 +1,27 @@
+fedala_plus:
+  algorithms:
+    - FedALA+
+  model: GIN
+
+  common:
+    num_clients: 10
+    rounds: 100
+    local_steps: 1
+    batch_size: 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam
+    
+    # === FedALA+ Specific Hyperparameters ===
+    # Original FedALA parameters
+    #eta: 1.0                    # Learning rate for ALA weight updates
+    #layer_idx: 1                # p=1: adapt only last layer (paper default)
+    rand_percent: 40            # CHANGED: 40% instead of 80% (disagreement sampling)
+    #threshold: 0.1              # Convergence threshold for ALA
+    #num_pre_loss: 10            # Window size for convergence check
+    
+    # NEW: Disagreement-based sampling parameters
+    use_disagreement: true      # Enable disagreement-based sampling
+    selection_frequency: 1      # Recompute disagreement every N rounds (1 = every round)
+    min_disagreement_samples: 20  # Fallback to random if < 20% samples have disagreement

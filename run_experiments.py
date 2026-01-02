@@ -83,6 +83,26 @@ def run_experiment(exp_config, seed):
 
     if args.simulation_mode in ["graph_fl_label_skew", "subgraph_fl_label_skew"]:
         args.skew_alpha = exp_config.get("skew_alpha", 1.0)
+
+    # Apply FedALA parameters if present in config #newaddition
+    if 'eta' in exp_config:
+        args.eta = exp_config['eta']
+    if 'layer_idx' in exp_config:
+        args.layer_idx = exp_config['layer_idx']
+    if 'rand_percent' in exp_config:
+        args.rand_percent = exp_config['rand_percent']
+    if 'threshold' in exp_config:
+        args.threshold = exp_config['threshold']
+    if 'num_pre_loss' in exp_config:
+        args.num_pre_loss = exp_config['num_pre_loss']
+    
+    # FedALA+ specific parameters
+    if 'use_disagreement' in exp_config:
+        args.use_disagreement = exp_config['use_disagreement']
+    if 'selection_frequency' in exp_config:
+        args.selection_frequency = exp_config['selection_frequency']
+    if 'min_disagreement_samples' in exp_config:
+        args.min_disagreement_samples = exp_config['min_disagreement_samples']    
     
     if 'layer_idx' in exp_config:
         args.layer_idx = exp_config['layer_idx']

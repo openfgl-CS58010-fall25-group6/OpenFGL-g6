@@ -78,6 +78,9 @@ _ALGO_NAME_MAP = {
     "GCFL+": "gcfl_plus",
     "FedSage+": "fedsage_plus",
     "FedALA": "fedala",
+    "FedALA+": "fedala_plus",
+    "FedALARegularized": "fedala_regularized",
+    "FedALA+Regularized": "fedala_plus_regularized",
     # Keep placeholders (may be unsupported in this fork)
     "FedNH": "fednh",
 }
@@ -144,6 +147,14 @@ def _build_experiment(
     lambda_graph: float = 0.0,        # NEW
     graph_reg_type: str = "laplacian", # NEW
     defaults: SweepDefaults,
+    # === NEW: FedALA+ parameters ===
+    eta: float = 1.0,
+    rand_percent: int = 80,
+    threshold: float = 0.1,
+    num_pre_loss: int = 10,
+    use_disagreement: bool = False,
+    selection_frequency: int = 1,
+    min_disagreement_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     exp: Dict[str, Any] = {
         "name": name,
@@ -163,6 +174,7 @@ def _build_experiment(
         "optim": optim,
         "metrics": ["accuracy"],
         "dirichlet_alpha": dirichlet_alpha,
+        "skew_alpha": skew_alpha,
     }
 
     # Only used by label_skew sims.
@@ -173,6 +185,20 @@ def _build_experiment(
         exp["lambda_graph"] = lambda_graph
     if graph_reg_type is not None:
         exp["graph_reg_type"] = graph_reg_type
+    # === NEW: Add FedALA/FedALA+ specific parameters ===
+    if algorithm in ["fedala", "fedala_plus", "fedala_regularized", "fedala_plus_regularized"]:
+        exp["eta"] = eta
+        exp["layer_idx"] = layer_idx
+        exp["rand_percent"] = rand_percent
+        exp["threshold"] = threshold
+        exp["num_pre_loss"] = num_pre_loss
+        
+        # FedALA+ specific (disagreement sampling)
+        if "plus" in algorithm:
+            exp["use_disagreement"] = use_disagreement
+            exp["selection_frequency"] = selection_frequency
+            exp["min_disagreement_samples"] = min_disagreement_samples
+
     return exp
 
 
@@ -209,6 +235,9 @@ def _iter_table6_experiments(
 
     fedala_yaml = included.get("fedala.yaml", {}).get("fedala", {})
     fedala_reg_yaml = included.get("fedala_reg.yaml", {}).get("fedala_reg", {})
+    fedala_plus_yaml = included.get("fedala_plus.yaml", {}).get("fedala_plus", {})
+    fedala_plus_regularized_yaml = included.get("fedala_plus_regularized.yaml", {}).get("fedala_plus_regularized", {})
+    fedala_regularized_yaml = included.get("fedala_regularized.yaml", {}).get("fedala_regularized", {})
 
     selected_groups = set(only_groups or ["local", "fl", "fgl"])
     if only_groups is not None and not selected_groups:
@@ -270,6 +299,16 @@ def _iter_table6_experiments(
                     lambda_graph = float(overrides.get("lambda_graph", group_common.get("lambda_graph", 0.0)))
                     graph_reg_type = str(overrides.get("graph_reg_type", group_common.get("graph_reg_type", "laplacian")))
 
+                    # === NEW: FedALA+ parameters ===
+                    eta = float(overrides.get("eta", group_common.get("eta", 1.0)))
+                    rand_percent = int(overrides.get("rand_percent", group_common.get("rand_percent", 80)))
+                    threshold = float(overrides.get("threshold", group_common.get("threshold", 0.1)))
+                    num_pre_loss = int(overrides.get("num_pre_loss", group_common.get("num_pre_loss", 10)))
+                    
+                    use_disagreement = bool(overrides.get("use_disagreement", group_common.get("use_disagreement", False)))
+                    selection_frequency = int(overrides.get("selection_frequency", group_common.get("selection_frequency", 1)))
+                    min_disagreement_samples = overrides.get("min_disagreement_samples", group_common.get("min_disagreement_samples"))
+
                     exp_name = f"Table6_{dataset}_{group_name}_{algo}_{model}"
 
                     experiments.append(
@@ -293,6 +332,15 @@ def _iter_table6_experiments(
                             lambda_graph=lambda_graph,
                             graph_reg_type=graph_reg_type,
                             defaults=defaults,
+                            # === NEW: FedALA+ params ===
+                            eta=eta,
+                            layer_idx=layer_idx,
+                            rand_percent=rand_percent,
+                            threshold=threshold,
+                            num_pre_loss=num_pre_loss,
+                            use_disagreement=use_disagreement,
+                            selection_frequency=selection_frequency,
+                            min_disagreement_samples=min_disagreement_samples,
                         )
                     )
 
@@ -306,6 +354,12 @@ def _iter_table6_experiments(
         add_group("fedala", fedala_yaml)
     if "fedala_reg" in selected_groups:
         add_group("fedala_reg", fedala_reg_yaml)
+    if "fedala_plus" in selected_groups:
+        add_group("fedala_plus", fedala_plus_yaml)
+    if "fedala_regularized" in selected_groups:
+        add_group("fedala_regularized", fedala_regularized_yaml)
+    if "fedala_plus_regularized" in selected_groups:
+        add_group("fedala_plus_regularized", fedala_plus_regularized_yaml)
 
     return experiments, warnings
 
@@ -358,6 +412,11 @@ def main() -> int:
     parser.add_argument("--graph-reg-type", type=str, default=None,
                         choices=["laplacian", "dirichlet"],
                         help="Type of graph regularization")
+    # === NEW: FedALA+ specific ===
+    parser.add_argument("--use-disagreement", action="store_true", default=None, help="Use disagreement-based sampling")
+    parser.add_argument("--no-use-disagreement", dest="use_disagreement", action="store_false", help="Disable disagreement sampling")
+    parser.add_argument("--selection-frequency", type=int, default=None, help="Recompute disagreement every N rounds")
+    parser.add_argument("--min-disagreement-samples", type=int, default=None, help="Minimum disagreement samples before fallback")
 
     args = parser.parse_args()
 
@@ -403,6 +462,12 @@ def main() -> int:
         overrides["lambda_graph"] = args.lambda_graph
     if args.graph_reg_type is not None:
         overrides["graph_reg_type"] = args.graph_reg_type
+    if args.use_disagreement is not None:
+        overrides["use_disagreement"] = args.use_disagreement
+    if args.selection_frequency is not None:
+        overrides["selection_frequency"] = args.selection_frequency
+    if args.min_disagreement_samples is not None:
+        overrides["min_disagreement_samples"] = args.min_disagreement_samples    
 
     experiments, warnings = _iter_table6_experiments(
         repo_root=repo_root,
@@ -429,8 +494,16 @@ def main() -> int:
     print(f"simulation_mode={simulation_mode}")
 
     if args.dry_run:
+
         for exp in experiments[:50]:
-            print(f"- {exp['name']} | {exp['dataset'][0]} | {exp['algorithm']} | {exp['model'][0]}")
+                extra_params_str = ""
+                if 'rand_percent' in exp:
+                    extra_params_str = f" | s={exp['rand_percent']}%"
+                    if exp.get('use_disagreement'):
+                        extra_params_str += f" disagr=✓"
+                    else:
+                        extra_params_str += f" disagr=✗"
+                print(f"- {exp['name']} | {exp['dataset'][0]} | {exp['algorithm']} | {exp['model'][0]} | {extra_params_str}")
         if len(experiments) > 50:
             print(f"... ({len(experiments) - 50} more)")
         return 0
@@ -478,6 +551,18 @@ def main() -> int:
 
                 "lambda_graph": exp.get("lambda_graph"),
                 "graph_reg_type": exp.get("graph_reg_type"),
+                    
+                # === NEW: ALA+-specific metrics ===
+                "rand_percent": exp.get("rand_percent"), #sample percent s
+                "use_disagreement": exp.get("use_disagreement"),
+                "selection_frequency": exp.get("selection_frequency"),
+                "min_disagreement_samples": exp.get("min_disagreement_samples"),
+    
+                # ALA+ runtime metrics (if available from result)
+                "mean_selection_time": result.get("mean_selection_time"),
+                "mean_ala_training_time": result.get("mean_ala_training_time"),
+                "cache_hit_rate": result.get("cache_hit_rate"),
+                "fallback_count": result.get("fallback_count"),
                 
                 # === PRIMARY RESULTS ===
                 # Test accuracy

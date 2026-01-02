@@ -5,6 +5,9 @@ include:
   - fgl.yaml
   - fedala.yaml
   - fedala_reg.yaml  # NEW: regularization experiments
+  - fedala_plus.yaml
+  #- fedala_regularized.yaml
+  #- fedala_plus_regularized.yaml
 
 experiment:
   seeds: [0, 1, 2, 3, 4]  # For ± std like in Table 6

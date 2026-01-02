@@ -1,0 +1,136 @@
+# Ablation study configurations for FedALA+
+fedala_plus_ablation:
+  
+  # Baseline: Original FedALA (random 80%)
+  baseline:
+    algorithms:
+      - FedALA
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80          # Random sampling
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: false   # Disable disagreement sampling
+  
+  # Experiment 1: Disagreement 40%
+  disagreement_40:
+    algorithms:
+      - FedALA+
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 40
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: true
+      selection_frequency: 1
+      min_disagreement_samples: 20
+  
+  # Experiment 2: Disagreement 30%
+  disagreement_30:
+    algorithms:
+      - FedALA+
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 30
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: true
+      selection_frequency: 1
+      min_disagreement_samples: 15
+  
+  # Experiment 3: Disagreement 20%
+  disagreement_20:
+    algorithms:
+      - FedALA+
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 20
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: true
+      selection_frequency: 1
+      min_disagreement_samples: 10
+  
+  # Experiment 4: Disagreement 40% with Caching (every 5 rounds)
+  disagreement_40_cached:
+    algorithms:
+      - FedALA+
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 40
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: true
+      selection_frequency: 5    # Recompute every 5 rounds
+      min_disagreement_samples: 20
+  
+  # Control: Random 40% (to isolate disagreement effect)
+  random_40:
+    algorithms:
+      - FedALA
+    model: GIN
+    common:
+      num_clients: 10
+      rounds: 100
+      local_steps: 1
+      batch_size: 128
+      lr: 0.001
+      weight_decay: 0.0005
+      dropout: 0.5
+      optimizer: adam
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 40          # Same percentage, but random
+      threshold: 0.1
+      num_pre_loss: 10
+      use_disagreement: false
