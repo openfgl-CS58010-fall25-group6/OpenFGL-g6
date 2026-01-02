@@ -49,11 +49,76 @@ class GraphClsTask(BaseTask):
         """
         super(GraphClsTask, self).__init__(args, client_id, data, data_dir, device)
         
+        # Add graph regularization parameters
+        self.lambda_graph = getattr(args, 'lambda_graph', 0.0)
+        self.graph_reg_type = getattr(args, 'graph_reg_type', 'laplacian')
+        
+    def compute_graph_regularization(self, logits, batch):
+        """
+        Compute graph smoothness regularization term.
+        
+        Args:
+            logits: Model predictions [num_nodes_in_batch, num_classes]
+            batch: PyG Batch object containing edge_index
+            
+        Returns:
+            regularization_loss: Scalar tensor
+        """
+        # Safety check: if no edge_index, return 0
+        if not hasattr(batch, 'edge_index') or batch.edge_index is None or batch.edge_index.size(1) == 0:
+            return torch.tensor(0.0, device=self.device)
+        
+        edge_index = batch.edge_index
+        
+        # Ensure edge indices are within bounds
+        num_nodes = logits.shape[0]
+        
+        # Filter out edges that reference nodes outside the current batch
+        valid_edges_mask = (edge_index[0] < num_nodes) & (edge_index[1] < num_nodes)
+        
+        if valid_edges_mask.sum() == 0:
+            # No valid edges in this batch
+            return torch.tensor(0.0, device=self.device)
+        
+        # Use only valid edges
+        valid_edge_index = edge_index[:, valid_edges_mask]
+        
+        if self.graph_reg_type == 'laplacian':
+            # Laplacian Regularization: Sum over edges of ||f(u) - f(v)||^2
+            src_logits = logits[valid_edge_index[0]]
+            dst_logits = logits[valid_edge_index[1]]
+            
+            diff = src_logits - dst_logits
+            
+            squared_diff = torch.mean(diff ** 2)  # Mean over all edges and features
+            reg_loss = squared_diff
+            
+        elif self.graph_reg_type == 'dirichlet':
+            # Dirichlet Energy: Similar to Laplacian but normalized by degree
+            # Compute node degrees using only valid edges
+            degree = torch.zeros(num_nodes, device=self.device)
+            degree.scatter_add_(0, valid_edge_index[0], torch.ones(valid_edge_index.shape[1], device=self.device))
+            degree = torch.clamp(degree, min=1.0)
+            
+            src_logits = logits[valid_edge_index[0]]
+            dst_logits = logits[valid_edge_index[1]]
+            
+            diff = src_logits - dst_logits
+            edge_weights = 1.0 / torch.sqrt(degree[valid_edge_index[0]] * degree[valid_edge_index[1]])
+            
+            weighted_diff = edge_weights.unsqueeze(1) * (diff ** 2)
+            reg_loss = torch.mean(weighted_diff)  # Mean over all edges and features
+            
+        else:
+            raise ValueError(f"Unknown graph_reg_type: {self.graph_reg_type}")
+            
+        return reg_loss
         
         
     def train(self, splitted_data=None):
         """
         Train the model on the provided or processed data.
+        NOW WITH GRAPH REGULARIZATION SUPPORT!
 
         Args:
             splitted_data (dict, optional): Dictionary containing split data and DataLoaders. Defaults to None.
@@ -70,8 +135,20 @@ class GraphClsTask(BaseTask):
             for batch in splitted_data["train_dataloader"]:
                 self.optim.zero_grad()
                 embedding, logits = self.model.forward(batch)
+                
+                # Compute task loss
                 loss_train = self.loss_fn(embedding, logits, batch.y, torch.ones_like(batch.y).bool())
-                loss_train.backward()
+                
+                # Add graph regularization if enabled
+                if self.lambda_graph > 0:
+                    graph_loss = self.compute_graph_regularization(logits, batch)
+                    total_loss = loss_train + self.lambda_graph * graph_loss
+                    print(f"Computing graph regularization with lambda={self.lambda_graph} and type={self.graph_reg_type} loss_train : {loss_train}, graph_loss : {graph_loss}" )
+                else:
+                    total_loss = loss_train
+                
+                total_loss.backward()
+                
                 if self.step_preprocess is not None:
                     self.step_preprocess()
                 self.optim.step()
