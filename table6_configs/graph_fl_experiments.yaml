@@ -6,6 +6,7 @@ include:
   - fedala.yaml
   - fedala_reg.yaml  # NEW: regularization experiments
   - fedala_plus.yaml
+  - fedalarc.yaml
   #- fedala_regularized.yaml
   #- fedala_plus_regularized.yaml
 

@@ -9,8 +9,9 @@ fl:
     - FedTGP
     - FedALA
     - FedALA+
-    - FedALARegularized
-    - FedALA+Regularized
+    - FedALARC
+    #- FedALARegularized
+    #- FedALA+Regularized
 
   model: GIN
 
@@ -54,4 +55,10 @@ fl:
       rand_percent: 80
       layer_idx: 1
       threshold: 0.1
-      num_pre_loss: 10         
+      num_pre_loss: 10    
+    FedALARC:
+      eta: 1.0
+      rand_percent: 80
+      layer_idx: 1
+      threshold: 0.1
+      num_pre_loss: 10        
