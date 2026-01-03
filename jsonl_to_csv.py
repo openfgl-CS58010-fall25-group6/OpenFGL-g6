@@ -1,5 +1,8 @@
 import json
 import csv
+import argparse
+import os
+
 
 def jsonl_to_csv_rows(jsonl_file, output_csv=None):
     """Convert JSONL results to CSV format matching your spreadsheet."""
@@ -10,13 +13,20 @@ def jsonl_to_csv_rows(jsonl_file, output_csv=None):
         for line in f:
             data = json.loads(line)
             
-            # Format accuracy as "mean±std"
-            accuracy_formatted = f"{data['mean_metric']:.2f}±{data['std_metric']:.2f}"
+            # Build algorithm name with relevant parameters
+            algo_parts = [f"GIN-{data['algorithm'].upper()}"]
+            if data.get('layer_idx') is not None:
+                algo_parts.append(f"layer_idx={data['layer_idx']}")
+            if data.get('lambda_graph') is not None and data.get('lambda_graph') > 0:
+                algo_parts.append(f"λ={data['lambda_graph']}")
+                algo_parts.append(f"{data.get('graph_reg_type', 'laplacian')}")
+            
+            algorithm_str = f"{algo_parts[0]} ({', '.join(algo_parts[1:])})" if len(algo_parts) > 1 else algo_parts[0]
             
             row = {
                 'Dataset': data['dataset'],
                 'Scenario': 'Graph-FL',
-                'Algorithm': f"GIN-FedALA (layer_idx={data.get('layer_idx', 'N/A')})",
+                'Algorithm': algorithm_str,
                 'Accuracy Reported in the paper': '',  # Fill manually
                 'Accuracy': round(data['mean_metric'], 2),
                 'std dev (acc)': round(data['std_metric'], 2),
@@ -34,10 +44,19 @@ def jsonl_to_csv_rows(jsonl_file, output_csv=None):
                 'weight_decay': data['weight_decay'],
                 'dropout': data['dropout'],
                 'optimizer': 'adam',
+                # FedALA parameters
+                'layer_idx': data.get('layer_idx', ''),
                 # Extra useful columns
-                'layer_idx': data.get('layer_idx', 'N/A'),
                 'val_accuracy': round(data['mean_val_metric'], 2),
                 'best_round': round(data['mean_best_round'], 1),
+                # Regularization parameters
+                'lambda_graph': data.get('lambda_graph', 0.0),
+                'graph_reg_type': data.get('graph_reg_type', ''),
+                # FedALA+ parameters
+                'rand_percent': data.get('rand_percent', ''),
+                'use_disagreement': data.get('use_disagreement', ''),
+                'selection_frequency': data.get('selection_frequency', ''),
+                'min_disagreement_samples': data.get('min_disagreement_samples', ''),
             }
             rows.append(row)
     
@@ -65,42 +84,19 @@ def jsonl_to_csv_rows(jsonl_file, output_csv=None):
     return rows
 
 
-# read file names (possibly more than one) from command line arguments
 if __name__ == "__main__":
-    import sys
-    import os
-
-    import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--files",
-    nargs="+",
-    required=True,
-    help="List of files to process"
-)
-
-args = parser.parse_args()
-
-for f in args.files:
-    print("Processing:", f)
-
-    import argparse
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Convert JSONL experiment results to CSV")
     parser.add_argument(
         "--files",
         nargs="+",
         required=True,
-        help="List of files to process"
+        help="List of JSONL files to process"
     )
-
+    
     args = parser.parse_args()
-
+    
     for f in args.files:
-        print("Processing:", f)
+        print(f"\nProcessing: {f}")
         base, ext = os.path.splitext(f)
         output_csv = base + ".csv" if ext == ".jsonl" else None
         jsonl_to_csv_rows(f, output_csv=output_csv)
-
-

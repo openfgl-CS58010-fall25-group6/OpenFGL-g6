@@ -334,7 +334,6 @@ def _iter_table6_experiments(
                             defaults=defaults,
                             # === NEW: FedALA+ params ===
                             eta=eta,
-                            layer_idx=layer_idx,
                             rand_percent=rand_percent,
                             threshold=threshold,
                             num_pre_loss=num_pre_loss,
