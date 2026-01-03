@@ -4,6 +4,7 @@ include:
   - fl.yaml
   - fgl.yaml
   - fedala.yaml
+  - fedala_reg.yaml  # NEW: regularization experiments
 
 experiment:
   seeds: [0, 1, 2, 3, 4]  # For ± std like in Table 6
@@ -18,3 +19,6 @@ defaults:
   rounds: 100
   local_steps: 1
   optimizer: adam
+  # Regularization defaults
+  lambda_graph: 0.0
+  graph_reg_type: laplacian

@@ -65,15 +65,42 @@ def jsonl_to_csv_rows(jsonl_file, output_csv=None):
     return rows
 
 
-# Process both files
-print("\n" + "#"*80)
-print("LAYER_IDX = 1 RESULTS")
-print("#"*80)
-jsonl_to_csv_rows('results/graph_fl/table6_graphfl_20260102_020732.jsonl', 
-                  'results/fedala_layer_idx_1.csv')
+# read file names (possibly more than one) from command line arguments
+if __name__ == "__main__":
+    import sys
+    import os
 
-print("\n" + "#"*80)
-print("LAYER_IDX = 0 RESULTS")
-print("#"*80)
-jsonl_to_csv_rows('results/graph_fl/table6_graphfl_20260102_020819.jsonl',
-                  'results/fedala_layer_idx_0.csv')
+    import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--files",
+    nargs="+",
+    required=True,
+    help="List of files to process"
+)
+
+args = parser.parse_args()
+
+for f in args.files:
+    print("Processing:", f)
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--files",
+        nargs="+",
+        required=True,
+        help="List of files to process"
+    )
+
+    args = parser.parse_args()
+
+    for f in args.files:
+        print("Processing:", f)
+        base, ext = os.path.splitext(f)
+        output_csv = base + ".csv" if ext == ".jsonl" else None
+        jsonl_to_csv_rows(f, output_csv=output_csv)
+
+

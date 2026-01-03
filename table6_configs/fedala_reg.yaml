@@ -1,0 +1,26 @@
+# FedALA with Laplacian Regularization (lambda=1000)
+# Simple version - one config per regularization setting
+
+fedala_reg:
+  algorithms:
+    - FedALA
+  model: GIN
+
+  common:
+    num_clients: 10
+    rounds: 100
+    local_steps: 1
+    batch_size: 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam
+    # FedALA specific
+    eta: 1.0
+    threshold: 0.1
+    num_pre_loss: 10
+    rand_percent: 80
+    layer_idx: 1
+    # Regularization
+    lambda_graph: 1000
+    graph_reg_type: laplacian

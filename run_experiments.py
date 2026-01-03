@@ -67,7 +67,7 @@ def run_experiment(exp_config, seed):
     args.num_pre_loss = exp_config.get('num_pre_loss', 10)
     args.rand_percent = exp_config.get('rand_percent', 80)
     args.layer_idx = exp_config.get('layer_idx', 1)
-    args.lambda_graph = exp_config.get('lambda_graph', 10)
+    args.lambda_graph = exp_config.get('lambda_graph', 0.0)
     args.graph_reg_type = exp_config.get('graph_reg_type', 'laplacian')
 
     # Eval/metrics

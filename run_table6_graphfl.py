@@ -141,6 +141,8 @@ def _build_experiment(
     dirichlet_alpha: float,
     skew_alpha: float,
     layer_idx: int = None,
+    lambda_graph: float = 0.0,        # NEW
+    graph_reg_type: str = "laplacian", # NEW
     defaults: SweepDefaults,
 ) -> Dict[str, Any]:
     exp: Dict[str, Any] = {
@@ -167,6 +169,10 @@ def _build_experiment(
     exp["skew_alpha"] = skew_alpha
     if layer_idx is not None:
         exp["layer_idx"] = layer_idx
+    if lambda_graph is not None:
+        exp["lambda_graph"] = lambda_graph
+    if graph_reg_type is not None:
+        exp["graph_reg_type"] = graph_reg_type
     return exp
 
 
@@ -202,6 +208,7 @@ def _iter_table6_experiments(
     fgl_yaml = included.get("fgl.yaml", {}).get("fgl", {})
 
     fedala_yaml = included.get("fedala.yaml", {}).get("fedala", {})
+    fedala_reg_yaml = included.get("fedala_reg.yaml", {}).get("fedala_reg", {})
 
     selected_groups = set(only_groups or ["local", "fl", "fgl"])
     if only_groups is not None and not selected_groups:
@@ -260,6 +267,9 @@ def _iter_table6_experiments(
 
                     layer_idx = int(overrides.get("layer_idx")) if overrides.get("layer_idx") is not None else None
 
+                    lambda_graph = float(overrides.get("lambda_graph", group_common.get("lambda_graph", 0.0)))
+                    graph_reg_type = str(overrides.get("graph_reg_type", group_common.get("graph_reg_type", "laplacian")))
+
                     exp_name = f"Table6_{dataset}_{group_name}_{algo}_{model}"
 
                     experiments.append(
@@ -280,6 +290,8 @@ def _iter_table6_experiments(
                             dirichlet_alpha=dirichlet_alpha,
                             skew_alpha=skew_alpha,
                             layer_idx=layer_idx,
+                            lambda_graph=lambda_graph,
+                            graph_reg_type=graph_reg_type,
                             defaults=defaults,
                         )
                     )
@@ -292,6 +304,8 @@ def _iter_table6_experiments(
         add_group("fgl", fgl_yaml)
     if "fedala" in selected_groups:
         add_group("fedala", fedala_yaml)
+    if "fedala_reg" in selected_groups:
+        add_group("fedala_reg", fedala_reg_yaml)
 
     return experiments, warnings
 
@@ -339,6 +353,12 @@ def main() -> int:
 
     parser.add_argument("--layer-idx", type=int, default=None, help="FedALA layer_idx param")
 
+    parser.add_argument("--lambda-graph", type=float, default=None, 
+                        help="Graph regularization strength (0=disabled)")
+    parser.add_argument("--graph-reg-type", type=str, default=None,
+                        choices=["laplacian", "dirichlet"],
+                        help="Type of graph regularization")
+
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent
@@ -379,6 +399,10 @@ def main() -> int:
         overrides["skew_alpha"] = args.skew_alpha
     if args.layer_idx is not None:
         overrides["layer_idx"] = args.layer_idx
+    if args.lambda_graph is not None:
+        overrides["lambda_graph"] = args.lambda_graph
+    if args.graph_reg_type is not None:
+        overrides["graph_reg_type"] = args.graph_reg_type
 
     experiments, warnings = _iter_table6_experiments(
         repo_root=repo_root,
@@ -451,6 +475,9 @@ def main() -> int:
 
                 # FedALA-specific params
                 "layer_idx": exp.get("layer_idx"),
+
+                "lambda_graph": exp.get("lambda_graph"),
+                "graph_reg_type": exp.get("graph_reg_type"),
                 
                 # === PRIMARY RESULTS ===
                 # Test accuracy

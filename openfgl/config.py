@@ -113,4 +113,10 @@ parser.add_argument("--eta", type=float, default=1.0, help="Learning rate for AL
 parser.add_argument("--layer_idx", type=int, default=1, help="Number of lower layers to freeze in ALA (0 = adapt all)")
 parser.add_argument("--rand_percent", type=int, default=80, help="Percentage of data for ALA")
 
+parser.add_argument("--lambda_graph", type=float, default=0.0, 
+                    help="Graph regularization strength (0=disabled)")
+parser.add_argument("--graph_reg_type", type=str, default="laplacian",
+                    choices=["laplacian", "dirichlet"],
+                    help="Type of graph regularization")
+
 args, unknown = parser.parse_known_args()
