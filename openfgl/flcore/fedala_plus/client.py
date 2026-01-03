@@ -33,7 +33,8 @@ class FedALAPlusClient(BaseClient):
         else:
             train_samples = "Unknown"
 
-        if client_id == 0:  # Only print for first client to avoid spam
+        #debug prints
+        """if client_id == 0:  # Only print for first client to avoid spam
             print(f"\n{'='*60}")
             print(f"FedALA+ Client {client_id} Initialization")
             print(f"{'='*60}")
@@ -47,7 +48,7 @@ class FedALAPlusClient(BaseClient):
             print(f"eta: {self.eta}")
             print(f"threshold: {self.threshold}")
             print(f"num_pre_loss: {self.num_pre_loss}")
-            print(f"{'='*60}\n")
+            print(f"{'='*60}\n")"""
         
         self.ala = ALA(
             client_id=self.client_id,
@@ -70,10 +71,11 @@ class FedALAPlusClient(BaseClient):
         3. Run Standard Local Training.
         """
 
-        if self.client_id == 0 and self.message_pool.get("round", 0) == 0:
+        #debug prints
+        """if self.client_id == 0 and self.message_pool.get("round", 0) == 0:
             print(f"\nClient {self.client_id}: execute() called")
             print(f"  use_disagreement = {self.use_disagreement}")
-            print(f"  rand_percent = {self.rand_percent}\n")
+            print(f"  rand_percent = {self.rand_percent}\n")"""
         # Get global weights from message pool
         global_weights = self.message_pool["server"]["weight"]
         

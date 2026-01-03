@@ -1,0 +1,62 @@
+fedalarc:
+  algorithms:
+    - FedALARC
+  model: GIN
+
+  common:
+    num_clients: 10
+    rounds: 100
+    local_steps: 1
+    batch_size: 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam
+    
+    # ALA parameters (from FedALA)
+    eta: 1.0
+    layer_idx: 1
+    rand_percent: 80
+    threshold: 0.1
+    num_pre_loss: 10
+    
+    # ARC parameters (new for FedALARC)
+    use_arc: True
+    max_byzantine: 2
+    
+  # Experiment configurations
+  experiments:
+    # Baseline: No Byzantine workers, no ARC
+    baseline:
+      use_arc: False
+      byzantine_ids: []
+      
+    # Byzantine robustness: f=1 with ARC
+    byzantine_f1:
+      use_arc: True
+      max_byzantine: 1
+      byzantine_ids: [0]
+      attack_type: sign_flip
+      
+    # Byzantine robustness: f=2 with ARC
+    byzantine_f2:
+      use_arc: True
+      max_byzantine: 2
+      byzantine_ids: [0, 5]
+      attack_type: sign_flip
+      
+    # High heterogeneity + Byzantine
+    hetero_byzantine:
+      use_arc: True
+      max_byzantine: 1
+      byzantine_ids: [0]
+      attack_type: sign_flip
+      dirichlet_alpha: 0.1  # High heterogeneity
+      
+    # Different attack types
+    gaussian_attack:
+      use_arc: True
+      max_byzantine: 1
+      byzantine_ids: [0]
+      attack_type: gaussian_noise
+      attack_params: '{"noise_scale": 10.0}'

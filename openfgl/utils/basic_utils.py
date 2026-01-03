@@ -115,7 +115,10 @@ def load_client(args, client_id, data, data_dir, message_pool, device):
     elif args.fl_algorithm == "fedala_plus":  # ADD THIS BLOCK
         from openfgl.flcore.fedala_plus import FedALAPlusClient
         return FedALAPlusClient(args, client_id, data, data_dir, message_pool, device)
-       
+    elif args.fl_algorithm == "fedalarc": 
+        from openfgl.flcore.fedalarc import FedALARCClient
+        return FedALARCClient(args, client_id, data, data_dir, message_pool, device)
+           
     #elif args.fl_algorithm == "fedala_regularized":
     #    from openfgl.flcore.fedala_regularized.client import FedALARegularizedClient
     #    return FedALARegularizedClient(args, client_id, data, data_dir, message_pool, device)
@@ -199,6 +202,9 @@ def load_server(args, global_data, data_dir, message_pool, device):
     elif args.fl_algorithm == "fedala_plus": 
         from openfgl.flcore.fedala_plus import FedALAPlusServer
         return FedALAPlusServer(args, global_data, data_dir, message_pool, device)
+    elif args.fl_algorithm == "fedalarc": 
+        from openfgl.flcore.fedalarc import FedALARCServer
+        return FedALARCServer(args, global_data, data_dir, message_pool, device)
     #elif args.fl_algorithm == "fedala_regularized":
     #    from openfgl.flcore.fedala_regularized.server import FedALARegularizedServer
     #    return FedALARegularizedServer(args, global_data, data_dir, message_pool, device)

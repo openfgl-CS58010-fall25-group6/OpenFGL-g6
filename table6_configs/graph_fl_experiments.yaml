@@ -5,6 +5,7 @@ include:
   - fgl.yaml
   - fedala.yaml
   - fedala_plus.yaml
+  - fedalarc.yaml
   #- fedala_regularized.yaml
   #- fedala_plus_regularized.yaml
 

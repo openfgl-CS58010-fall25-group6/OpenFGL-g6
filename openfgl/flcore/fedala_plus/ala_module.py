@@ -98,7 +98,7 @@ class ALA:
             params_g = list(global_model_params.parameters())
         
         # === DEBUG: Check parameter loading ===
-        print(f"Client {self.cid}: Loading {len(params_g)} parameter tensors into global model")
+        #print(f"Client {self.cid}: Loading {len(params_g)} parameter tensors into global model")
         
         with torch.no_grad():
             for idx, (param_g_model, param_g_data) in enumerate(zip(model_g.parameters(), params_g)):
@@ -123,11 +123,11 @@ class ALA:
             raise ValueError("ALA: No data loader found.")
         
         # === DEBUG: Check data loader ===
-        try:
+        """try:
             total_batches = len(full_loader)
             print(f"Client {self.cid}: Data loader has {total_batches} batches")
         except:
-            print(f"Client {self.cid}: Data loader length unknown (generator?)")
+            print(f"Client {self.cid}: Data loader length unknown (generator?)")"""
         
         disagreement_scores = []
         batch_indices = []
@@ -138,8 +138,8 @@ class ALA:
                 batch = batch.to(self.device)
                 
                 # === DEBUG: First batch ===
-                if batch_idx == 0:
-                    print(f"Client {self.cid}: First batch - {len(batch.y)} samples")
+                """if batch_idx == 0:
+                    print(f"Client {self.cid}: First batch - {len(batch.y)} samples")"""
                 
                 # Get predictions from both models
                 try:
@@ -161,8 +161,8 @@ class ALA:
                     logits_g = output_g
                 
                 # === DEBUG: Check logits ===
-                if batch_idx == 0:
-                    print(f"Client {self.cid}: Logits shape - local: {logits_l.shape}, global: {logits_g.shape}")
+                """if batch_idx == 0:
+                    print(f"Client {self.cid}: Logits shape - local: {logits_l.shape}, global: {logits_g.shape}")"""
                 
                 # Compute disagreement metrics
                 pred_l = torch.argmax(logits_l, dim=1)
@@ -181,10 +181,10 @@ class ALA:
                 batch_disagreement = disagreement.mean().item()
                 
                 # === DEBUG: First batch disagreement ===
-                if batch_idx == 0:
+                """if batch_idx == 0:
                     print(f"Client {self.cid}: First batch disagreement score: {batch_disagreement:.4f}")
                     print(f"  Label disagreements: {label_disagreement.sum().item()}/{len(label_disagreement)}")
-                    print(f"  Avg KL divergence: {kl_div.mean().item():.4f}")
+                    print(f"  Avg KL divergence: {kl_div.mean().item():.4f}")"""
                 
                 # Store batch-level information
                 disagreement_scores.append(batch_disagreement)
@@ -192,7 +192,7 @@ class ALA:
                 batch_sizes.append(len(batch.y))
         
         # === DEBUG: Summary statistics ===
-        print(f"Client {self.cid}: Processed {len(batch_indices)} batches total")
+        #print(f"Client {self.cid}: Processed {len(batch_indices)} batches total")
         
         if len(disagreement_scores) == 0:
             print(f"Client {self.cid}: ERROR - No disagreement scores computed!")
@@ -203,23 +203,23 @@ class ALA:
         batch_indices = np.array(batch_indices)
         batch_sizes = np.array(batch_sizes)
         
-        print(f"Client {self.cid}: Disagreement stats - "
+        """print(f"Client {self.cid}: Disagreement stats - "
             f"mean: {disagreement_scores.mean():.4f}, "
             f"std: {disagreement_scores.std():.4f}, "
             f"min: {disagreement_scores.min():.4f}, "
-            f"max: {disagreement_scores.max():.4f}")
+            f"max: {disagreement_scores.max():.4f}")"""
         
         # Calculate target number of samples
         total_samples = sum(batch_sizes)
         target_samples = int(total_samples * sample_percent / 100)
         
-        print(f"Client {self.cid}: Total samples: {total_samples}, Target: {target_samples} ({sample_percent}%)")
+        #print(f"Client {self.cid}: Total samples: {total_samples}, Target: {target_samples} ({sample_percent}%)")
         
         # Sort batches by disagreement score (descending)
         sorted_indices = np.argsort(disagreement_scores)[::-1]
         
-        print(f"Client {self.cid}: Top 5 disagreement scores: {disagreement_scores[sorted_indices[:5]]}")
-        print(f"Client {self.cid}: Bottom 5 disagreement scores: {disagreement_scores[sorted_indices[-5:]]}")
+        #print(f"Client {self.cid}: Top 5 disagreement scores: {disagreement_scores[sorted_indices[:5]]}")
+        #print(f"Client {self.cid}: Bottom 5 disagreement scores: {disagreement_scores[sorted_indices[-5:]]}")
         
         # Select batches until we reach target samples
         selected_batches = []

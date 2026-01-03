@@ -81,6 +81,7 @@ _ALGO_NAME_MAP = {
     "FedALA+": "fedala_plus",
     "FedALARegularized": "fedala_regularized",
     "FedALA+Regularized": "fedala_plus_regularized",
+    "FedALARC": "fedalarc",
     # Keep placeholders (may be unsupported in this fork)
     "FedNH": "fednh",
 }
@@ -176,7 +177,7 @@ def _build_experiment(
     }
 
     # === NEW: Add FedALA/FedALA+ specific parameters ===
-    if algorithm in ["fedala", "fedala_plus", "fedala_regularized", "fedala_plus_regularized"]:
+    if algorithm in ["fedala", "fedala_plus", "fedala_regularized", "fedala_plus_regularized", "fedalarc"]:
         exp["eta"] = eta
         exp["layer_idx"] = layer_idx
         exp["rand_percent"] = rand_percent
@@ -227,6 +228,7 @@ def _iter_table6_experiments(
     fedala_plus_yaml = included.get("fedala_plus.yaml", {}).get("fedala_plus", {})
     fedala_plus_regularized_yaml = included.get("fedala_plus_regularized.yaml", {}).get("fedala_plus_regularized", {})
     fedala_regularized_yaml = included.get("fedala_regularized.yaml", {}).get("fedala_regularized", {})
+    fedalarc_yaml = included.get("fedalarc.yaml", {}).get("fedalarc", {})
 
     selected_groups = set(only_groups or ["local", "fl", "fgl"])
     if only_groups is not None and not selected_groups:
@@ -338,6 +340,8 @@ def _iter_table6_experiments(
         add_group("fedala_regularized", fedala_regularized_yaml)
     if "fedala_plus_regularized" in selected_groups:
         add_group("fedala_plus_regularized", fedala_plus_regularized_yaml)
+    if "fedalarc" in selected_groups:
+        add_group("fedalarc", fedalarc_yaml)    
 
     return experiments, warnings
 
@@ -432,7 +436,17 @@ def main() -> int:
     if args.selection_frequency is not None:
         overrides["selection_frequency"] = args.selection_frequency
     if args.min_disagreement_samples is not None:
-        overrides["min_disagreement_samples"] = args.min_disagreement_samples    
+        overrides["min_disagreement_samples"] = args.min_disagreement_samples
+    if args.eta is not None:
+        overrides["eta"] = args.eta
+    if args.layer_idx is not None:
+        overrides["layer_idx"] = args.layer_idx
+    if args.rand_percent is not None:
+        overrides["rand_percent"] = args.rand_percent
+    if args.threshold is not None:
+        overrides["threshold"] = args.threshold
+    if args.num_pre_loss is not None:
+        overrides["num_pre_loss"] = args.num_pre_loss        
 
     experiments, warnings = _iter_table6_experiments(
         repo_root=repo_root,
