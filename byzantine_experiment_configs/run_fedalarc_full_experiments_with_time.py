@@ -348,9 +348,10 @@ def get_byzantine_configs(dataset):
         'skew_alpha': 0.5,
         'num_clients': 10,
         'rounds': 30,
-        'local_epochs': 3,
-        'batch_size': 16,
-        'lr': 0.01,
+        'local_epochs': 1, #changed after commit
+        'local_steps': 1, #???
+        'batch_size': 128, #changed after commit
+        'lr': 0.001, #changed after commit
         'weight_decay': 5e-4,
         'dropout': 0.5,
         'optimizer': 'adam',
