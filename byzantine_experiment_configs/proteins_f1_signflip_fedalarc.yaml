@@ -1,0 +1,48 @@
+# Byzantine Robustness Experiment: f=1 Sign-Flip Attack on PROTEINS
+# Run with: python run_experiments.py --config configs/byzantine/proteins_f1_signflip_fedalarc.yaml
+
+name: PROTEINS_f1_signflip_FedALARC
+seeds: [0, 1, 2, 3, 4]
+
+# Dataset & Task
+dataset: PROTEINS
+scenario: graph_fl
+task: graph_cls
+model: GIN
+
+# Simulation
+simulation_mode: graph_fl_label_skew
+dirichlet_alpha: 0.5
+num_clients: 10
+
+# Training
+num_rounds: 100
+local_epochs: 1
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0005
+dropout: 0.5
+optim: adam
+
+# Algorithm
+algorithm: fedalarc
+
+# FedALA parameters
+eta: 1.0
+layer_idx: 1
+rand_percent: 80
+threshold: 0.1
+num_pre_loss: 10
+
+# ARC parameters (ENABLED)
+use_arc: True
+max_byzantine: 1
+
+# Byzantine attack configuration
+byzantine_ids: [0]
+attack_type: sign_flip
+attack_params: "{}"
+
+# Metrics
+metrics: [accuracy]
+evaluation_mode: local_model_on_local_data

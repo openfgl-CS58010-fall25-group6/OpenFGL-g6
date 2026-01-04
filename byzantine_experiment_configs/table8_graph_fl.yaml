@@ -1,0 +1,98 @@
+# ============================================================
+# Table 8 Replication: Graph-FL Generalization Performance
+# ============================================================
+# Tests different simulation strategies (heterogeneity types)
+# Datasets: PROTEINS, ENZYMES (representative Graph-FL datasets)
+# ============================================================
+
+include:
+  - datasets.yaml
+
+experiment:
+  name: "table8_graph_fl_generalization"
+  seeds: [0, 1, 2, 3, 4]
+  output_dir: results/table8_graph_fl/
+
+# ============================================================
+# Common settings matching OpenFGL paper
+# ============================================================
+defaults:
+  scenario: graph_fl
+  task: graph_cls
+  model: GIN
+  num_clients: 5
+  rounds: 100
+  local_steps: 1
+  batch_size: 128
+  lr: 0.001
+  weight_decay: 0.0005
+  dropout: 0.5
+  optimizer: adam
+  metrics: [accuracy]
+  evaluation_mode: local_model_on_local_data
+
+# ============================================================
+# Algorithms to compare
+# ============================================================
+algorithms:
+  # FL Baselines
+  - name: FedAvg
+    algorithm: fedavg
+    
+  - name: FedProx
+    algorithm: fedprox
+    params:
+      mu: 0.01
+      
+  # FGL-specific
+  - name: GCFL+
+    algorithm: gcfl_plus
+    
+  - name: FedStar
+    algorithm: fedstar
+    
+  # FedALA variants
+  - name: FedALA
+    algorithm: fedala
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      
+  - name: FedALA-ARC
+    algorithm: fedalarc
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      use_arc: False  # No Byzantine attacks in Table 8
+      max_byzantine: 0
+      byzantine_ids: []
+
+# ============================================================
+# Datasets for Table 8
+# ============================================================
+datasets:
+  - PROTEINS
+  - ENZYMES
+
+# ============================================================
+# Simulation strategies (Table 8 columns)
+# ============================================================
+simulations:
+  # Feature Distribution Skew
+  - name: feature_skew
+    simulation_mode: graph_fl_feature_skew
+    
+  # Label Distribution Skew (α=0.5 as per paper)
+  - name: label_skew
+    simulation_mode: graph_fl_label_skew
+    dirichlet_alpha: 0.5
+    
+  # Topology Skew
+  - name: topology_skew
+    simulation_mode: graph_fl_topology_skew

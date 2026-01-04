@@ -1,0 +1,144 @@
+# ============================================================
+# Byzantine Robustness Experiments for FedALA-ARC
+# ============================================================
+# This is the KEY experiment that demonstrates FedALA-ARC's value
+# Shows performance degradation under Byzantine attacks
+# and how ARC mitigates it
+# ============================================================
+
+experiment:
+  name: "byzantine_robustness"
+  seeds: [0, 1, 2, 3, 4]
+  output_dir: results/byzantine_robustness/
+
+# ============================================================
+# Common settings
+# ============================================================
+defaults:
+  scenario: graph_fl
+  task: graph_cls
+  model: GIN
+  num_clients: 10  # More clients to test f=1,2,3
+  rounds: 100
+  local_steps: 1
+  batch_size: 128
+  lr: 0.001
+  weight_decay: 0.0005
+  dropout: 0.5
+  optimizer: adam
+  metrics: [accuracy]
+  evaluation_mode: local_model_on_local_data
+  simulation_mode: graph_fl_label_skew
+  dirichlet_alpha: 0.5  # Moderate heterogeneity
+
+# ============================================================
+# Datasets for Byzantine experiments
+# ============================================================
+datasets:
+  - PROTEINS
+  - ENZYMES
+  # Optional: Add Cora for Subgraph-FL comparison
+
+# ============================================================
+# Attack configurations
+# ============================================================
+attack_scenarios:
+  # Baseline: No attack
+  - name: no_attack
+    num_byzantine: 0
+    byzantine_ids: []
+    attack_type: none
+    
+  # f=1 Byzantine worker (10% adversarial)
+  - name: f1_sign_flip
+    num_byzantine: 1
+    byzantine_ids: [0]
+    attack_type: sign_flip
+    
+  # f=2 Byzantine workers (20% adversarial)
+  - name: f2_sign_flip
+    num_byzantine: 2
+    byzantine_ids: [0, 1]
+    attack_type: sign_flip
+    
+  # f=3 Byzantine workers (30% adversarial)
+  - name: f3_sign_flip
+    num_byzantine: 3
+    byzantine_ids: [0, 1, 2]
+    attack_type: sign_flip
+    
+  # Different attack type: Gaussian noise
+  - name: f2_gaussian
+    num_byzantine: 2
+    byzantine_ids: [0, 1]
+    attack_type: gaussian_noise
+    attack_params:
+      noise_scale: 10.0
+
+# ============================================================
+# Methods to compare
+# ============================================================
+methods:
+  # Baseline: FedAvg (no protection)
+  - name: FedAvg
+    algorithm: fedavg
+    use_arc: False
+    
+  # FedALA without ARC (vulnerable to attacks)
+  - name: FedALA
+    algorithm: fedala
+    use_arc: False
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      
+  # FedALA-ARC with ARC disabled (same as FedALA, for sanity check)
+  - name: FedALARC-NoARC
+    algorithm: fedalarc
+    use_arc: False
+    max_byzantine: 0
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      
+  # FedALA-ARC with ARC enabled (f=1)
+  - name: FedALARC-f1
+    algorithm: fedalarc
+    use_arc: True
+    max_byzantine: 1
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      
+  # FedALA-ARC with ARC enabled (f=2)
+  - name: FedALARC-f2
+    algorithm: fedalarc
+    use_arc: True
+    max_byzantine: 2
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10
+      
+  # FedALA-ARC with ARC enabled (f=3)
+  - name: FedALARC-f3
+    algorithm: fedalarc
+    use_arc: True
+    max_byzantine: 3
+    params:
+      eta: 1.0
+      layer_idx: 1
+      rand_percent: 80
+      threshold: 0.1
+      num_pre_loss: 10

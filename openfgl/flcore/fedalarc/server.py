@@ -1,3 +1,13 @@
+"""
+FedALARC Server - Corrected Version
+
+Implements Adaptive Robust Clipping (ARC) from ICLR 2025 paper.
+Key corrections:
+1. Handle edge case when k=0 (no clipping needed)
+2. Better validation of inputs
+3. More robust gradient computation
+"""
+
 import torch
 import copy
 from openfgl.flcore.fedavg.server import FedAvgServer
@@ -11,11 +21,12 @@ class FedALARCServer(FedAvgServer):
     1. Standard FedAvg aggregation (inherited)
     2. Optional ARC pre-aggregation clipping for Byzantine robustness
     
-    ARC Algorithm:
-    - Computes gradient norms from all clients
-    - Clips the largest k gradients where k = floor(2*(f/n)*(n-f))
-    - Clipping threshold C = norm of (k+1)-th largest gradient
-    - Preserves theoretical robustness guarantees
+    ARC Algorithm (from Algorithm 2 in paper):
+    - Input: f (max Byzantine workers) and x_1, ..., x_n (client gradients)
+    - Find permutation π such that ||x_π(1)|| ≥ ||x_π(2)|| ≥ ... ≥ ||x_π(n)||
+    - Set k = floor(2 * (f/n) * (n-f))
+    - Set C = ||x_π(k+1)|| (clipping threshold)
+    - Output: Clip_C(x_1, ..., x_n)
     """
     
     def __init__(self, args, global_data, data_dir, message_pool, device):
@@ -51,6 +62,36 @@ class FedALARCServer(FedAvgServer):
         else:
             print(f"FedALARC Server: ARC DISABLED (operating as standard FedALA)")
     
+    def _compute_gradient_norm(self, client_weight, global_weights):
+        """
+        Compute the gradient (update) and its L2 norm for a client.
+        
+        Gradient is defined as: g = w_local - w_global
+        
+        Args:
+            client_weight: List of client model parameters
+            global_weights: List of global model parameters
+            
+        Returns:
+            Tuple of (gradient list, L2 norm)
+        """
+        grad = []
+        total_norm_sq = 0.0
+        
+        for local_param, global_param in zip(client_weight, global_weights):
+            # Handle both Parameter and Tensor types
+            local_data = local_param.data if hasattr(local_param, 'data') else local_param
+            global_data = global_param.data if hasattr(global_param, 'data') else global_param
+            
+            # Gradient = local - global (the update direction)
+            g = local_data - global_data
+            grad.append(g)
+            
+            # Accumulate squared norm
+            total_norm_sq += g.norm(2).item() ** 2
+        
+        return grad, total_norm_sq ** 0.5
+    
     def arc_clip(self, client_weights, f, n):
         """
         Adaptive Robust Clipping (ARC).
@@ -58,10 +99,10 @@ class FedALARCServer(FedAvgServer):
         Algorithm from "Adaptive Gradient Clipping for Robust Federated Learning" (ICLR 2025):
         1. Compute gradient g_i = w_i - w_global for each client i
         2. Compute norms ||g_i|| for all clients
-        3. Sort norms in descending order
+        3. Sort norms in descending order to get permutation π
         4. Compute k = floor(2 * (f/n) * (n-f))
-        5. Set clipping threshold C = ||g_{(k+1)}|| (norm of (k+1)-th largest)
-        6. For each gradient: if ||g_i|| > C, scale to C
+        5. Set clipping threshold C = ||g_{π(k+1)}|| (norm of (k+1)-th largest)
+        6. For each gradient: if ||g_i|| > C, scale g_i to have norm C
         
         Args:
             client_weights: List of client model weights (list of parameter lists)
@@ -71,6 +112,19 @@ class FedALARCServer(FedAvgServer):
         Returns:
             List of clipped client weights
         """
+        # Validate inputs
+        if n <= 0:
+            print(f"  ⚠ ARC: Invalid n={n}, skipping clipping")
+            return client_weights
+        
+        if f < 0:
+            print(f"  ⚠ ARC: Invalid f={f}, skipping clipping")
+            return client_weights
+        
+        if f >= n / 2:
+            print(f"  ⚠ ARC: f={f} violates Byzantine assumption (f < n/2 where n={n})")
+            print(f"       ARC cannot guarantee robustness, proceeding anyway...")
+        
         # Get global model weights for gradient computation
         global_weights = list(self.task.model.parameters())
         
@@ -81,38 +135,48 @@ class FedALARCServer(FedAvgServer):
         norms = []
         
         for client_weight in client_weights:
-            grad = []
-            total_norm_sq = 0.0
-            
-            for local_param, global_param in zip(client_weight, global_weights):
-                # Gradient = local - global
-                g = local_param.data - global_param.data
-                grad.append(g)
-                
-                # Accumulate squared norm
-                total_norm_sq += g.norm(2).item() ** 2
-            
+            grad, norm = self._compute_gradient_norm(client_weight, global_weights)
             gradients.append(grad)
-            norms.append(total_norm_sq ** 0.5)
+            norms.append(norm)
         
         # ========================================
-        # Step 3: Sort by norm (descending)
+        # Step 3: Sort by norm (descending) to get permutation π
         # ========================================
+        # sorted_indices[i] gives the index of the (i+1)-th largest gradient
         sorted_indices = sorted(range(len(norms)), key=lambda i: norms[i], reverse=True)
         
         # ========================================
-        # Step 4-5: Compute k and clipping threshold
+        # Step 4: Compute k = floor(2 * (f/n) * (n-f))
         # ========================================
-        k = int(2 * (f / n) * (n - f))
+        k = int(2 * (f / n) * (n - f))  # int() truncates toward zero = floor for positive
         
-        if k >= len(norms) - 1:
-            # Not enough clients to perform clipping
-            # This happens when n is too small or f is too large
-            print(f"  ⚠ ARC: Not enough clients for clipping (k={k}, n={n})")
+        # ========================================
+        # Edge case handling
+        # ========================================
+        
+        # Edge case 1: k = 0 means no clipping needed
+        if k == 0:
+            print(f"  ✓ ARC: k=0, no clipping needed (f/n ratio too small)")
             return client_weights
         
-        # Clipping threshold C = norm of (k+1)-th largest gradient
-        C = norms[sorted_indices[k]]
+        # Edge case 2: k >= n means we can't determine a valid threshold
+        if k >= n:
+            print(f"  ⚠ ARC: k={k} >= n={n}, cannot compute threshold")
+            print(f"       This happens when f is too large relative to n")
+            return client_weights
+        
+        # ========================================
+        # Step 5: Set clipping threshold C = ||g_{π(k+1)}||
+        # ========================================
+        # In 0-based indexing: sorted_indices[k] is the (k+1)-th largest
+        threshold_idx = sorted_indices[k]
+        C = norms[threshold_idx]
+        
+        # Handle edge case where C = 0 (all remaining gradients are zero)
+        if C == 0:
+            print(f"  ⚠ ARC: Threshold C=0, all gradients at or below index {k} are zero")
+            # In this case, clip all non-zero gradients to zero
+            C = 1e-10  # Small epsilon to avoid division by zero
         
         # ========================================
         # Step 6: Clip gradients and reconstruct weights
@@ -125,31 +189,40 @@ class FedALARCServer(FedAvgServer):
                 # No clipping needed - gradient is within threshold
                 clipped_weights.append(client_weight)
             else:
-                # Clip: scale gradient to threshold, then add back to global
+                # Clip: scale gradient to have norm C, then add back to global
+                # clip_C(g) = g * min(1, C / ||g||) = g * (C / ||g||) when ||g|| > C
                 scale = C / norm
                 clipped_grad = [g * scale for g in grad]
-                clipped_weight = [
-                    global_param.data + cg 
-                    for global_param, cg in zip(global_weights, clipped_grad)
-                ]
                 
-                # Convert to Parameter objects
-                clipped_weight = [
-                    w if isinstance(w, torch.nn.Parameter) else torch.nn.Parameter(w)
-                    for w in clipped_weight
-                ]
+                # Reconstruct weights: w_clipped = w_global + clipped_grad
+                clipped_weight = []
+                for global_param, cg in zip(global_weights, clipped_grad):
+                    global_data = global_param.data if hasattr(global_param, 'data') else global_param
+                    new_weight = global_data + cg
+                    
+                    # Ensure output is a Parameter
+                    if not isinstance(new_weight, torch.nn.Parameter):
+                        new_weight = torch.nn.Parameter(new_weight.clone())
+                    clipped_weight.append(new_weight)
+                
                 clipped_weights.append(clipped_weight)
                 num_clipped += 1
         
+        # ========================================
         # Log clipping statistics
+        # ========================================
         if num_clipped > 0:
             max_norm = max(norms)
             min_norm = min(norms)
-            print(f"  🔒 ARC: Clipped {num_clipped}/{n} clients")
-            print(f"      Threshold C = {C:.4f}")
-            print(f"      Norm range: [{min_norm:.4f}, {max_norm:.4f}]")
+            avg_norm = sum(norms) / len(norms)
+            print(f"  🔒 ARC Clipping Statistics:")
+            print(f"      - Clipped: {num_clipped}/{n} clients")
+            print(f"      - Threshold C = {C:.6f}")
+            print(f"      - k = {k}")
+            print(f"      - Norm range: [{min_norm:.6f}, {max_norm:.6f}]")
+            print(f"      - Avg norm: {avg_norm:.6f}")
         else:
-            print(f"  ✓ ARC: No clipping needed (all norms ≤ {C:.4f})")
+            print(f"  ✓ ARC: No clipping needed (all {n} norms ≤ {C:.6f})")
         
         return clipped_weights
     
@@ -159,7 +232,7 @@ class FedALARCServer(FedAvgServer):
         
         Steps:
         1. Collect client weights from message pool
-        2. Apply ARC if enabled (clips Byzantine gradients)
+        2. Apply ARC if enabled (clips potentially Byzantine gradients)
         3. Perform FedAvg aggregation (inherited from FedAvgServer)
         """
         # Get sampled clients for this round
@@ -172,28 +245,45 @@ class FedALARCServer(FedAvgServer):
         # ========================================
         # Apply ARC if enabled
         # ========================================
-        if self.use_arc and len(sampled_clients) > self.max_byzantine:
-            # Collect client weights
-            client_weights = [
-                self.message_pool[f"client_{client_id}"]["weight"]
-                for client_id in sampled_clients
-            ]
+        if self.use_arc:
+            n = len(sampled_clients)
+            f = self.max_byzantine
             
-            # Apply ARC clipping
-            clipped_weights = self.arc_clip(
-                client_weights, 
-                f=self.max_byzantine, 
-                n=len(sampled_clients)
-            )
-            
-            # Update message pool with clipped weights
-            for i, client_id in enumerate(sampled_clients):
-                self.message_pool[f"client_{client_id}"]["weight"] = clipped_weights[i]
-        
-        elif self.use_arc:
-            print(f"  ⚠ ARC: Skipping (need > {self.max_byzantine} clients, got {len(sampled_clients)})")
+            # Check if we have enough clients for ARC to be meaningful
+            if n <= f:
+                print(f"  ⚠ ARC: Skipping (need > {f} clients, got {n})")
+            elif n <= 2 * f:
+                print(f"  ⚠ ARC: Warning - n={n} ≤ 2f={2*f}, Byzantine assumption violated")
+                print(f"       Proceeding with clipping but robustness not guaranteed")
+                self._apply_arc_clipping(sampled_clients)
+            else:
+                self._apply_arc_clipping(sampled_clients)
         
         # ========================================
         # Standard FedAvg aggregation
         # ========================================
         super(FedALARCServer, self).execute()
+    
+    def _apply_arc_clipping(self, sampled_clients):
+        """
+        Helper method to apply ARC clipping to client weights.
+        
+        Args:
+            sampled_clients: List of client IDs participating in this round
+        """
+        # Collect client weights
+        client_weights = []
+        for client_id in sampled_clients:
+            weight = self.message_pool[f"client_{client_id}"]["weight"]
+            client_weights.append(weight)
+        
+        # Apply ARC clipping
+        clipped_weights = self.arc_clip(
+            client_weights, 
+            f=self.max_byzantine, 
+            n=len(sampled_clients)
+        )
+        
+        # Update message pool with clipped weights
+        for i, client_id in enumerate(sampled_clients):
+            self.message_pool[f"client_{client_id}"]["weight"] = clipped_weights[i]
