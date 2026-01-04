@@ -347,11 +347,10 @@ def get_byzantine_configs(dataset):
         'dirichlet_alpha': 0.5,
         'skew_alpha': 0.5,
         'num_clients': 10,
-        'rounds': 30,
-        'local_epochs': 1, #changed after commit
-        'local_steps': 1, #???
-        'batch_size': 128, #changed after commit
-        'lr': 0.001, #changed after commit
+        'rounds': 50,
+        'local_epochs': 3,
+        'batch_size': 16,
+        'lr': 0.01,
         'weight_decay': 5e-4,
         'dropout': 0.5,
         'optimizer': 'adam',
@@ -368,8 +367,8 @@ def get_byzantine_configs(dataset):
     # Attack scenarios
     attacks = [
         ('no_attack', [], 'none', 0.0),
-        ('f2_attack', [0, 1], 'scaled_sign_flip', 5.0),
-        ('f3_attack', [0, 1, 2], 'scaled_sign_flip', 5.0),
+        ('f2_attack', [0, 1], 'scaled_sign_flip', 1.0),
+        ('f3_attack', [0, 1, 2], 'scaled_sign_flip', 1.0),
     ]
     
     # Methods to compare
