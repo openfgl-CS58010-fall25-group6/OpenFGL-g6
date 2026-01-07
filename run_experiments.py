@@ -340,10 +340,34 @@ if __name__ == "__main__":
     parser.add_argument('--seeds', type=int, nargs='+', default=None,
                         help='Random seeds to use (overrides config file)')
     
+    # NEW: Add override parameters for batch experiments
+    parser.add_argument('--dataset', type=str, nargs='+', default=None,
+                        help='Dataset(s) to use (overrides config file)')
+    parser.add_argument('--num-clients', type=int, default=None,
+                        help='Number of clients (overrides config file)')
+    parser.add_argument('--graph-reg-type', type=str, default=None,
+                        help='Graph regularization type (overrides config file)')
+    parser.add_argument('--lambda-graph', type=float, default=None,
+                        help='Lambda value for graph regularization (overrides config file)')
+    parser.add_argument('--exp-name', type=str, default=None,
+                        help='Experiment name (overrides config file)')
+    
     args = parser.parse_args()
     
     # Load configuration
     exp_config = load_config(args.config)
+    
+    # Override config with command-line arguments if provided
+    if args.dataset is not None:
+        exp_config['dataset'] = args.dataset
+    if args.num_clients is not None:
+        exp_config['num_clients'] = args.num_clients
+    if args.graph_reg_type is not None:
+        exp_config['graph_reg_type'] = args.graph_reg_type
+    if args.lambda_graph is not None:
+        exp_config['lambda_graph'] = args.lambda_graph
+    if args.exp_name is not None:
+        exp_config['name'] = args.exp_name
     
     # Get seeds
     seeds = args.seeds if args.seeds is not None else exp_config.get('seeds', [42])
