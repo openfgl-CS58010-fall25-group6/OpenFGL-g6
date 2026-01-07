@@ -23,7 +23,7 @@ eta: 1.0
 threshold: 0.1
 num_pre_loss: 10
 rand_percent: 80
-layer_idx: 1
+layer_idx: 0
 lambda_graph: 1000
 graph_reg_type: dirichlet
 # Evaluation

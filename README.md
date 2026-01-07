@@ -1,3 +1,90 @@
+# CS58010 Fall 2025 Group 6 - FedALA Integration for OpenFGL
+
+## Results Spreadsheet
+For refrence, some of the experimental results are recorded here: [Google Sheets - CS58010 Group 6 Results](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+---
+
+## Installation & Environment Setup
+
+**Important:** Before running any experiments, you must set up the conda environment.
+
+1. **Read the installation instructions:**
+```bash
+   cat read_me_for_installing_the_env.txt
+```
+
+2. **Create the conda environment:**
+```bash
+   # Option 1: Using environment.yml
+   conda env create -f docs/updated_environment.yml
+   
+   # Option 2: Using requirements.txt
+   conda create -n openfgl python=3.10 -y
+   conda activate openfgl
+   pip install -r docs/new_requirements2.txt
+```
+
+3. **Activate the environment:**
+```bash
+   conda activate openfgl
+```
+
+---
+
+## Instructions to Reproduce CS58010 Group 6's Results
+
+### 1. Reproducing Results for Table 6 and Figure 2a of the Original OpenFGL Paper
+
+**Results Tab:** `OpenFGL_reproduce` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+Configuration files are inside `configs/graph_fl/`. Choose the specific case you want to run:
+```bash
+# Example: Run FedAvg on DD dataset
+python -u run_experiments.py --config configs/graph_fl/dd/dd_fedavg.yaml
+
+# Other examples:
+python -u run_experiments.py --config configs/graph_fl/mutag/mutag_fedprox.yaml
+python -u run_experiments.py --config configs/graph_fl/proteins/proteins_gcfl_plus.yaml
+```
+
+**Output Format:**
+At the end of the output, results will appear in this order:
+```
+"Dataset", "Scenario", "Algorithm", "Accuracy Reported",
+"Test Acc", "Std Dev", "Val Acc", "Best Round",
+"Comm (MB)", "Time (s)", "Task", "Model",
+"Simulation Mode", "Num Clients", "Dirichlet Alpha",
+"Num Rounds", "Local Epochs", "Batch Size",
+"LR", "Weight Decay", "Dropout", "Optimizer"
+```
+
+---
+
+### 2. Running the Regularization Code
+
+**Results Tab:** `regularization_experiments` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+Configuration files are inside `configs/fedala_regularization_configs/`:
+```bash
+# Example: Run FedALA with Laplacian regularization on BZR
+python -u run_experiments.py --config configs/fedala_regularization_configs/bzr_fedala_laplacian_reg_clean.yaml
+```
+
+We ran the experiments in truba in parallel, so instead of preparing differnt configuration files for every setup we just specified the specific parameter's value from the command line. So if wanted to reproduce all of our regularization results from the report, you could use the barbun_submit_all_fedala_experiments.sh file.  
+
+**Output Format:** Same as above.
+
+---
+
+
+---
+
+<br><br>
+
+---
+
+# Original OpenFGL Documentation
 
 ![1301717130101_ pic](https://github.com/zyl24/OpenFGL/assets/59046279/e21b410f-2b5d-4515-8ab5-a176f98805a7)
 
