@@ -367,8 +367,8 @@ def get_byzantine_configs(dataset):
     # Attack scenarios
     attacks = [
         ('no_attack', [], 'none', 0.0),
-        ('f2_attack', [0, 1], 'scaled_sign_flip', 1.0),
-        ('f3_attack', [0, 1, 2], 'scaled_sign_flip', 1.0),
+        ('f2_attack', [0, 1], 'scaled_sign_flip', 3.0),
+        ('f3_attack', [0, 1, 2], 'scaled_sign_flip', 3.0),
     ]
     
     # Methods to compare
