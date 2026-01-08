@@ -1,3 +1,150 @@
+# CS58010 Fall 2025 Group 6 - FedALA Integration for OpenFGL
+
+## Results Spreadsheet
+For refrence, some of the experimental results are recorded here: [Google Sheets - CS58010 Group 6 Results](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+---
+
+## Installation & Environment Setup
+
+**Important:** Before running any experiments, you must set up the conda environment.
+
+1. **Read the installation instructions:**
+```bash
+   cat read_me_for_installing_the_env.txt
+```
+
+2. **Create the conda environment:**
+```bash
+   # Option 1: Using environment.yml
+   conda env create -f docs/updated_environment.yml
+   
+   # Option 2: Using requirements.txt
+   conda create -n openfgl python=3.10 -y
+   conda activate openfgl
+   pip install -r docs/new_requirements2.txt
+```
+
+3. **Activate the environment:**
+```bash
+   conda activate openfgl
+```
+
+---
+
+## Instructions to Reproduce CS58010 Group 6's Results
+
+### 1. Reproducing Results for Table 6 and Figure 2a of the Original OpenFGL Paper
+
+**Results Tab:** `OpenFGL_reproduce` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+#### For FedALA and other algorithms that are already in the OpenFGL paper (replace "fedala" with the algorithm names):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients 5 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --seeds 42 123 456
+```
+
+#### Alternatively:
+Configuration files are inside `configs/graph_fl/`. Choose the specific case you want to run:
+```bash
+# Example: Run FedAvg on DD dataset
+python -u run_experiments.py --config configs/graph_fl/dd/dd_fedavg.yaml
+
+# Other examples:
+python -u run_experiments.py --config configs/graph_fl/mutag/mutag_fedprox.yaml
+python -u run_experiments.py --config configs/graph_fl/proteins/proteins_gcfl_plus.yaml
+```
+
+**Output Format:**
+At the end of the output, results will appear in this order:
+```
+"Dataset", "Scenario", "Algorithm", "Accuracy Reported",
+"Test Acc", "Std Dev", "Val Acc", "Best Round",
+"Comm (MB)", "Time (s)", "Task", "Model",
+"Simulation Mode", "Num Clients", "Dirichlet Alpha",
+"Num Rounds", "Local Epochs", "Batch Size",
+"LR", "Weight Decay", "Dropout", "Optimizer"
+```
+
+---
+
+### 2. Running proposed approaches (FedALALayer0, FedALAReg, FedALA+, FedALARC):
+
+#### 2.1. FedALALayer0 (FedALA with layer_idx=0):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients 5 --layer_idx 0 --seeds 42 123 456 
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --layer_idx 0 --seeds 42 123 456
+```
+
+#### 2.2. FedALAReg (FedALA with Regularization):
+**Results Tab:** `regularization_experiments` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
+
+##### FedALAReg Baseline (no regularization):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 0.0 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 0.0 --seeds 42 123 456
+```
+
+##### FedALARegL (Laplacian Regularization with λ=1000):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
+```
+##### FedALARegD (Dirichlet Regularization with λ=1000):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
+```
+
+##### Alternatively:
+Configuration files are inside `configs/fedala_regularization_configs/`:
+```bash
+# Example: Run FedALA with Laplacian regularization on BZR
+python -u run_experiments.py --config configs/fedala_regularization_configs/bzr_fedala_laplacian_reg_clean.yaml
+```
+
+We ran the experiments in truba in parallel, so instead of preparing differnt configuration files for every setup we just specified the specific parameter's value from the command line. So if wanted to reproduce all of our regularization results from the report, you could use the barbun_submit_all_fedala_experiments.sh file.  
+
+**Output Format:** Same as above.
+
+
+#### 2.3. FedALA+ (Disagreement-based Selective Sampling):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_plus --datasets MUTAG COX2 --num-clients 5 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_plus --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --seeds 42 123 456
+```
+#### 2.4. FedALARC (FedALA + Adaptive Robust Clipping):
+```bash
+python run_fedalarc_full_experiments_with_time.py --dataset PROTEINS --seeds 42 123 456
+```
+---
+
+
+---
+
+<br><br>
+
+---
+
+# Original OpenFGL Documentation
 
 ![1301717130101_ pic](https://github.com/zyl24/OpenFGL/assets/59046279/e21b410f-2b5d-4515-8ab5-a176f98805a7)
 
