@@ -71,9 +71,9 @@ At the end of the output, results will appear in this order:
 
 ---
 
-### 2. Running proposed approaches:
+### 2. Running proposed approaches (FedALALayer0, FedALAReg, FedALA+, FedALARC):
 
-#### 2.1. FedALALayer0:
+#### 2.1. FedALALayer0 (FedALA with layer_idx=0):
 ```bash
 # Small datasets (5 clients)
 python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients 5 --layer_idx 0 --seeds 42 123 456 
@@ -82,10 +82,10 @@ python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients
 python run_table6_graphfl.py --groups fedala --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --layer_idx 0 --seeds 42 123 456
 ```
 
-#### 2.2. FedALAReg:
+#### 2.2. FedALAReg (FedALA with Regularization):
 **Results Tab:** `regularization_experiments` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
 
-#### FedALAReg Baseline (no regularization):
+##### FedALAReg Baseline (no regularization):
 ```bash
 # Small datasets (5 clients)
 python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 0.0 --seeds 42 123 456
@@ -94,17 +94,15 @@ python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-cli
 python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 0.0 --seeds 42 123 456
 ```
 
-#### FedALARegL (Laplacian Regularization with λ=1000):
+##### FedALARegL (Laplacian Regularization with λ=1000):
 ```bash
-# for FedALARegL (Laplacian Regularization with λ=1000):
-
 # Small datasets (5 clients)
 python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
 
 # Standard datasets (10 clients)
 python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
 ```
-#### FedALARegD (Dirichlet Regularization with λ=1000):
+##### FedALARegD (Dirichlet Regularization with λ=1000):
 ```bash
 # Small datasets (5 clients)
 python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
@@ -113,7 +111,7 @@ python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-cli
 python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
 ```
 
-#### Alternatively:
+##### Alternatively:
 Configuration files are inside `configs/fedala_regularization_configs/`:
 ```bash
 # Example: Run FedALA with Laplacian regularization on BZR
@@ -123,6 +121,17 @@ python -u run_experiments.py --config configs/fedala_regularization_configs/bzr_
 We ran the experiments in truba in parallel, so instead of preparing differnt configuration files for every setup we just specified the specific parameter's value from the command line. So if wanted to reproduce all of our regularization results from the report, you could use the barbun_submit_all_fedala_experiments.sh file.  
 
 **Output Format:** Same as above.
+
+
+#### 2.3. FedALA+ (Disagreement-based Selective Sampling):
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_plus --datasets MUTAG COX2 --num-clients 5 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_plus --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --seeds 42 123 456
+
+#### 2.4. FedALARC (FedALA + Adaptive Robust Clipping):
+python run_fedalarc_full_experiments_with_time.py --dataset PROTEINS --seeds 42 123 456
 
 ---
 
