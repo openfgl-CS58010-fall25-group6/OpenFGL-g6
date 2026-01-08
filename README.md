@@ -38,6 +38,16 @@ For refrence, some of the experimental results are recorded here: [Google Sheets
 
 **Results Tab:** `OpenFGL_reproduce` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
 
+#### For FedALA and other algorithms that are already in the OpenFGL paper (replace "fedala" with the algorithm names):
+```bash
+# Small datasets (5 clients)
+# python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients 5 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --seeds 42 123 456
+```
+
+#### Alternatively:
 Configuration files are inside `configs/graph_fl/`. Choose the specific case you want to run:
 ```bash
 # Example: Run FedAvg on DD dataset
@@ -61,10 +71,49 @@ At the end of the output, results will appear in this order:
 
 ---
 
-### 2. Running the Regularization Code
+### 2. Running proposed approaches:
 
+#### 2.1. FedALALayer0:
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala --datasets MUTAG COX2 --num-clients 5 --layer_idx 0 --seeds 42 123 456 
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --layer_idx 0 --seeds 42 123 456
+```
+
+#### 2.2. FedALAReg:
 **Results Tab:** `regularization_experiments` in the [spreadsheet](https://docs.google.com/spreadsheets/d/1IW_IZTJXF-h-B8g9ly8zyBHfuTcnIyZpIQVH-xSyIZg/edit?usp=sharing)
 
+#### FedALAReg Baseline (no regularization):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 0.0 --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 0.0 --seeds 42 123 456
+```
+
+#### FedALARegL (Laplacian Regularization with λ=1000):
+```bash
+# for FedALARegL (Laplacian Regularization with λ=1000):
+
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type laplacian --seeds 42 123 456
+```
+#### FedALARegD (Dirichlet Regularization with λ=1000):
+```bash
+# Small datasets (5 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets MUTAG COX2 --num-clients 5 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
+
+# Standard datasets (10 clients)
+python run_table6_graphfl.py --groups fedala_reg --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --lambda-graph 1000 --graph-reg-type dirichlet --seeds 42 123 456
+```
+
+#### Alternatively:
 Configuration files are inside `configs/fedala_regularization_configs/`:
 ```bash
 # Example: Run FedALA with Laplacian regularization on BZR
