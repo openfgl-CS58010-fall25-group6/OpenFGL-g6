@@ -124,15 +124,17 @@ We ran the experiments in truba in parallel, so instead of preparing differnt co
 
 
 #### 2.3. FedALA+ (Disagreement-based Selective Sampling):
+```bash
 # Small datasets (5 clients)
 python run_table6_graphfl.py --groups fedala_plus --datasets MUTAG COX2 --num-clients 5 --seeds 42 123 456
 
 # Standard datasets (10 clients)
 python run_table6_graphfl.py --groups fedala_plus --datasets BZR ENZYMES DD PROTEINS IMDB-BINARY IMDB-MULTI COLLAB --num-clients 10 --seeds 42 123 456
-
+```
 #### 2.4. FedALARC (FedALA + Adaptive Robust Clipping):
+```bash
 python run_fedalarc_full_experiments_with_time.py --dataset PROTEINS --seeds 42 123 456
-
+```
 ---
 
 
