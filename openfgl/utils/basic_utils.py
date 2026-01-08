@@ -109,7 +109,22 @@ def load_client(args, client_id, data, data_dir, message_pool, device):
     elif args.fl_algorithm == "fedgl":
         from openfgl.flcore.fedgl.client import FedGLClient
         return FedGLClient(args, client_id, data, data_dir, message_pool, device)
-    
+    elif args.fl_algorithm == "fedala":
+        from openfgl.flcore.fedala.client import FedALAClient
+        return FedALAClient(args, client_id, data, data_dir, message_pool, device)
+    elif args.fl_algorithm == "fedala_plus":  # ADD THIS BLOCK
+        from openfgl.flcore.fedala_plus import FedALAPlusClient
+        return FedALAPlusClient(args, client_id, data, data_dir, message_pool, device)
+    elif args.fl_algorithm == "fedalarc": 
+        from openfgl.flcore.fedalarc import FedALARCClient
+        return FedALARCClient(args, client_id, data, data_dir, message_pool, device)
+           
+    #elif args.fl_algorithm == "fedala_regularized":
+    #    from openfgl.flcore.fedala_regularized.client import FedALARegularizedClient
+    #    return FedALARegularizedClient(args, client_id, data, data_dir, message_pool, device)
+    #elif args.fl_algorithm == "fedala_plus_regularized":
+    #    from openfgl.flcore.fedala_plus_regularized.client import FedALAPlusRegularizedClient
+    #    return FedALFedALAPlusRegularizedClient(args, client_id, data, data_dir, message_pool, device)    
 def load_server(args, global_data, data_dir, message_pool, device):
     """
     Loads and returns an instance of a server based on the federated learning algorithm specified in the arguments.
@@ -181,7 +196,21 @@ def load_server(args, global_data, data_dir, message_pool, device):
     elif args.fl_algorithm == "fedgl":
         from openfgl.flcore.fedgl.server import FedGLServer
         return FedGLServer(args, global_data, data_dir, message_pool, device)
-    
+    elif args.fl_algorithm == "fedala":
+        from openfgl.flcore.fedala.server import FedALAServer
+        return FedALAServer(args, global_data, data_dir, message_pool, device)
+    elif args.fl_algorithm == "fedala_plus": 
+        from openfgl.flcore.fedala_plus import FedALAPlusServer
+        return FedALAPlusServer(args, global_data, data_dir, message_pool, device)
+    elif args.fl_algorithm == "fedalarc": 
+        from openfgl.flcore.fedalarc import FedALARCServer
+        return FedALARCServer(args, global_data, data_dir, message_pool, device)
+    #elif args.fl_algorithm == "fedala_regularized":
+    #    from openfgl.flcore.fedala_regularized.server import FedALARegularizedServer
+    #    return FedALARegularizedServer(args, global_data, data_dir, message_pool, device)
+    #elif args.fl_algorithm == "fedala_plus_regularized":
+    #    from openfgl.flcore.fedala_plus_regularized.server import FedALAPlusRegularizedServer
+    #    return FedALFedALAPlusRegularizedServer(args, global_data, data_dir, message_pool, device)
 def load_optim(args):
     """
     Loads and returns an optimizer class based on the specification in the arguments.

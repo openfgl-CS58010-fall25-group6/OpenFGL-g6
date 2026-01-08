@@ -1,0 +1,15 @@
+fgl:
+  algorithms:
+    - GCFL+
+    - FedStar
+  model: GIN
+
+  common:
+    num_clients: 10
+    rounds: 100           # Paper uses 100
+    local_steps: 1
+    batch_size: 128       # Paper uses 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam

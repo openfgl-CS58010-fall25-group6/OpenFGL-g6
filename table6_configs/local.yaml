@@ -1,0 +1,18 @@
+local:
+  algorithms:
+    - Local
+  models:
+    - GIN
+    - SAGPooling
+    - EdgePooling
+    - PANPooling
+
+  common:
+    num_clients: 5
+    rounds: 100           # Paper uses 100, not 50
+    local_steps: 1
+    batch_size: 128       # Paper uses 128, not 32
+    lr: 0.001             # 1e-3 as per paper
+    weight_decay: 0.0005  # 5e-4 as per paper
+    dropout: 0.5          # As per paper
+    optimizer: adam

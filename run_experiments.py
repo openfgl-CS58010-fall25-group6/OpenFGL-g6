@@ -61,12 +61,20 @@ def run_experiment(exp_config, seed):
     args.dropout = exp_config['dropout']
     args.optim = exp_config.get('optim', 'adam')
 
+    # # FedALA specific parameters
+    args.eta = exp_config.get('eta', 1.0)
+    args.threshold = exp_config.get('threshold', 0.1)
+    args.num_pre_loss = exp_config.get('num_pre_loss', 10)
+    args.rand_percent = exp_config.get('rand_percent', 80)
+    args.layer_idx = exp_config.get('layer_idx', 1)
+    args.lambda_graph = exp_config.get('lambda_graph', 0.0)
+    args.graph_reg_type = exp_config.get('graph_reg_type', 'laplacian')
+
     # Eval/metrics
     args.metrics = exp_config.get('metrics', ['accuracy'])
     args.evaluation_mode = exp_config.get('evaluation_mode', args.evaluation_mode)
 
     # Logging
-    # args.comm_cost = True
     args.comm_cost = exp_config['algorithm'] != 'isolate'
     args.debug = True
     args.log_root = "./logs_reproduce"
@@ -75,17 +83,40 @@ def run_experiment(exp_config, seed):
 
     if args.simulation_mode in ["graph_fl_label_skew", "subgraph_fl_label_skew"]:
         args.skew_alpha = exp_config.get("skew_alpha", 1.0)
+
+    # Apply FedALA parameters if present in config #newaddition
+    if 'eta' in exp_config:
+        args.eta = exp_config['eta']
+    if 'layer_idx' in exp_config:
+        args.layer_idx = exp_config['layer_idx']
+    if 'rand_percent' in exp_config:
+        args.rand_percent = exp_config['rand_percent']
+    if 'threshold' in exp_config:
+        args.threshold = exp_config['threshold']
+    if 'num_pre_loss' in exp_config:
+        args.num_pre_loss = exp_config['num_pre_loss']
     
+    # FedALA+ specific parameters
+    if 'use_disagreement' in exp_config:
+        args.use_disagreement = exp_config['use_disagreement']
+    if 'selection_frequency' in exp_config:
+        args.selection_frequency = exp_config['selection_frequency']
+    if 'min_disagreement_samples' in exp_config:
+        args.min_disagreement_samples = exp_config['min_disagreement_samples']    
+    
+    if 'layer_idx' in exp_config:
+        args.layer_idx = exp_config['layer_idx']
+        
     # Train
     start_time = time.time()
     trainer = FGLTrainer(args)
 
     # Patch torch.load for PyTorch 2.6+ issue
     original_torch_load = torch.load
-    def patched_torch_load(*args, **kwargs):
-        if "weights_only" not in kwargs:
-            kwargs["weights_only"] = False
-        return original_torch_load(*args, **kwargs)
+    def patched_torch_load(*a, **kw):
+        if "weights_only" not in kw:
+            kw["weights_only"] = False
+        return original_torch_load(*a, **kw)
     torch.load = patched_torch_load
 
     trainer.train()
@@ -97,35 +128,51 @@ def run_experiment(exp_config, seed):
     # Extract metrics based on task
     if exp_config['task'] in ['graph_cls', 'node_cls']:
         metric_name = 'accuracy'
-        test_metric = results.get(f'best_test_{metric_name}', 0)
-        val_metric = results.get(f'best_val_{metric_name}', 0)
     elif exp_config['task'] == 'graph_reg':
         metric_name = exp_config.get('metrics', ['mse'])[0]
-        test_metric = results.get(f'best_test_{metric_name}', 0)
-        val_metric = results.get(f'best_val_{metric_name}', 0)
     else:
-        test_metric = 0
-        val_metric = 0
+        metric_name = 'accuracy'
     
+    test_metric = results.get(f'best_test_{metric_name}', 0)
+    val_metric = results.get(f'best_val_{metric_name}', 0)
     best_round = results.get('best_round', 0)
+    
+    # NEW: Try to get final round metrics (vs best) for convergence analysis
+    final_test_metric = results.get(f'final_test_{metric_name}', test_metric)
+    final_val_metric = results.get(f'final_val_{metric_name}', val_metric)
 
     # Get communication cost from logger pickle file
     log_path = os.path.join(args.log_root, f"{args.log_name}.pkl")
     total_comm_kb = 0
+    per_round_metrics = []  # NEW: for convergence analysis
     
     if os.path.exists(log_path) and exp_config['algorithm'] != 'isolate':
         with open(log_path, 'rb') as f:
             log_data = pickle.load(f)
             avg_cost_per_round = log_data.get('avg_cost_per_round', 0)
             total_comm_kb = avg_cost_per_round
+            # NEW: Try to extract per-round data if available
+            per_round_metrics = log_data.get('per_round_metrics', [])
+            # Debug: print available keys to discover more data
+            # print(f"Log data keys: {log_data.keys()}")
     
     total_comm_mb = total_comm_kb / 1024  # Convert KB to MB
     
     # Convert to percentage if accuracy
-    if metric_name == 'accuracy' and test_metric < 1:
-        test_metric *= 100
-        val_metric *= 100
+    if metric_name == 'accuracy':
+        if test_metric < 1:
+            test_metric *= 100
+        if val_metric < 1:
+            val_metric *= 100
+        if final_test_metric < 1:
+            final_test_metric *= 100
+        if final_val_metric < 1:
+            final_val_metric *= 100
     
+    print("-" * 50)
+    print(f"curr_round: {exp_config['num_rounds']-1}  curr_val_{metric_name}: {final_val_metric:.4f}\tcurr_test_{metric_name}: {final_test_metric:.4f}")
+    print(f"best_round: {best_round}  best_val_{metric_name}: {val_metric:.4f}\tbest_test_{metric_name}: {test_metric:.4f}")
+    print("-" * 50)
     print(f"Best Round: {best_round}")
     print(f"Best Val {metric_name}: {val_metric:.2f}")
     print(f"Best Test {metric_name}: {test_metric:.2f}")
@@ -133,39 +180,55 @@ def run_experiment(exp_config, seed):
     if exp_config['algorithm'] != 'isolate':
         print(f"Communication Cost: {total_comm_mb:.2f} MB")
     else:
-        print(f"Communication Cost: N/A (local training only)")
+        print("Communication Cost: N/A (local training only)")
     
     return {
         'test_metric': test_metric,
+        'val_metric': val_metric,  # NEW
+        'best_round': best_round,  # NEW
+        'final_test_metric': final_test_metric,  # NEW
+        'final_val_metric': final_val_metric,  # NEW
         'running_time': running_time,
         'comm_cost_mb': total_comm_mb,
+        'per_round_metrics': per_round_metrics,  # NEW (may be empty)
+        'seed': seed,  # NEW: track which seed produced this
     }
 
 
 def run_experiments(exp_config, seeds=[42, 123, 456]):
     """Run experiments with multiple seeds"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"EXPERIMENT: {exp_config['name']}")
-    print("="*70)
+    print("=" * 70)
     print(f"Dataset: {exp_config['dataset']}")
     print(f"Algorithm: {exp_config['algorithm']}")
     print(f"Scenario: {exp_config['scenario']}")
     print(f"Seeds: {seeds}")
-    print("="*70)
+    print("=" * 70)
     
+    all_results = []  # NEW: store full results per seed
     all_test_metrics = []
+    all_val_metrics = []  # NEW
+    all_best_rounds = []  # NEW
     all_times = []
     all_comm_costs = []
     
     for seed in seeds:
         result = run_experiment(exp_config, seed)
+        all_results.append(result)  # NEW
         all_test_metrics.append(result['test_metric'])
+        all_val_metrics.append(result['val_metric'])  # NEW
+        all_best_rounds.append(result['best_round'])  # NEW
         all_times.append(result['running_time'])
         all_comm_costs.append(result['comm_cost_mb'])
     
     # Calculate statistics
     mean_metric = np.mean(all_test_metrics)
     std_metric = np.std(all_test_metrics)
+    mean_val_metric = np.mean(all_val_metrics)  # NEW
+    std_val_metric = np.std(all_val_metrics)  # NEW
+    mean_best_round = np.mean(all_best_rounds)  # NEW
+    std_best_round = np.std(all_best_rounds)  # NEW
     mean_time = np.mean(all_times)
     std_time = np.std(all_times)
     mean_comm = np.mean(all_comm_costs)
@@ -173,119 +236,106 @@ def run_experiments(exp_config, seeds=[42, 123, 456]):
     
     metric_name = exp_config.get('metrics', ['accuracy'])[0]
     
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"FINAL RESULTS: {exp_config['name']}")
-    print("="*70)
+    print("=" * 70)
     print(f"Test {metric_name.upper()}: {mean_metric:.2f} ± {std_metric:.2f}")
+    print(f"Val {metric_name.upper()}: {mean_val_metric:.2f} ± {std_val_metric:.2f}")  # NEW
+    print(f"Best Round: {mean_best_round:.1f} ± {std_best_round:.1f}")  # NEW
     print(f"Running Time (s): {mean_time:.2f} ± {std_time:.2f}")
     print(f"Communication Cost (MB): {mean_comm:.2f} ± {std_comm:.2f}")
-    print(f"Individual Test Metrics: {[f'{r:.2f}' for r in all_test_metrics]}")
-    print("="*70 + "\n")
+    print(f"Individual Test Metrics: {[f'{m:.2f}' for m in all_test_metrics]}")
+    print("=" * 70 + "\n")
     
     return {
         'name': exp_config['name'],
+        # Test metrics
         'mean_metric': mean_metric,
         'std_metric': std_metric,
+        'test_metrics': all_test_metrics,
+        # NEW: Validation metrics
+        'mean_val_metric': mean_val_metric,
+        'std_val_metric': std_val_metric,
+        'val_metrics': all_val_metrics,
+        # NEW: Convergence info
+        'mean_best_round': mean_best_round,
+        'std_best_round': std_best_round,
+        'best_rounds': all_best_rounds,
+        # Time
         'mean_time': mean_time,
         'std_time': std_time,
+        'times': all_times,
+        # Communication
         'mean_comm': mean_comm,
         'std_comm': std_comm,
-        'test_metrics': all_test_metrics,
-        'times': all_times,
         'comm_costs': all_comm_costs,
-        'config': exp_config  # Store config for later use
+        # NEW: Full per-seed results for detailed analysis
+        'per_seed_results': all_results,
+        # Config
+        'config': exp_config,
     }
 
 
 def print_google_sheets_format(result):
     """Print results in tab-separated format for easy copy-paste to Google Sheets"""
-    config = result['config']
+    cfg = result['config']
     
-    # Extract values with proper defaults
-    dataset = config.get('dataset', ['N/A'])[0] if isinstance(config.get('dataset'), list) else config.get('dataset', 'N/A')
-    scenario = config.get('scenario', 'N/A')
-    algorithm = config.get('algorithm', 'N/A')
-    accuracy_reported = ""  # You'll fill this manually from the paper
-    accuracy = f"{result['mean_metric']:.2f}"
-    std_dev = f"{result['std_metric']:.2f}"
-    comm_cost = f"{result['mean_comm']:.2f}"
-    time_seconds = f"{result['mean_time']:.2f}"
-    task = config.get('task', 'N/A')
-    model = config.get('model', ['N/A'])[0] if isinstance(config.get('model'), list) else config.get('model', 'N/A')
-    simulation_mode = config.get('simulation_mode', 'N/A')
-    num_clients = config.get('num_clients', 'N/A')
-    dirichlet_alpha = config.get('dirichlet_alpha', 'N/A')
-    num_rounds = config.get('num_rounds', 'N/A')
-    local_epochs = config.get('local_epochs', config.get('num_epochs', 'N/A'))
-    batch_size = config.get('batch_size', 'N/A')
-    lr = config.get('lr', 'N/A')
-    weight_decay = config.get('weight_decay', 'N/A')
-    dropout = config.get('dropout', 'N/A')
-    optimizer = config.get('optim', 'N/A')
+    dataset = cfg.get('dataset', ['N/A'])
+    if isinstance(dataset, list):
+        dataset = dataset[0]
     
-    # Print header
-    print("\n" + "="*100)
-    print("GOOGLE SHEETS FORMAT - COPY THE LINE BELOW (tab-separated)")
-    print("="*100)
+    model = cfg.get('model', ['N/A'])
+    if isinstance(model, list):
+        model = model[0]
     
-    # Print column names (for reference)
-    header = "\t".join([
-        "Dataset",
-        "Scenario", 
-        "Algorithm",
-        "Accuracy Reported",
-        "Accuracy",
-        "Std Dev (acc)",
-        "Communication Cost (MB)",
-        "Time (seconds)",
-        "Task",
-        "Model",
-        "Simulation Mode",
-        "Num Clients",
-        "Dirichlet Alpha",
-        "Num Rounds",
-        "Local Epochs",
-        "Batch Size",
-        "LR",
-        "Weight Decay",
-        "Dropout",
-        "Optimizer"
-    ])
-    print("\nColumn Headers (for reference):")
-    print(header)
+    # Build data row
+    fields = [
+        dataset,
+        cfg.get('scenario', 'N/A'),
+        cfg.get('algorithm', 'N/A'),
+        "",  # Accuracy Reported (fill from paper)
+        f"{result['mean_metric']:.2f}",
+        f"{result['std_metric']:.2f}",
+        f"{result['mean_val_metric']:.2f}",  # NEW
+        f"{result['mean_best_round']:.1f}",  # NEW
+        f"{result['mean_comm']:.2f}",
+        f"{result['mean_time']:.2f}",
+        cfg.get('task', 'N/A'),
+        model,
+        cfg.get('simulation_mode', 'N/A'),
+        cfg.get('num_clients', 'N/A'),
+        cfg.get('dirichlet_alpha', 'N/A'),
+        cfg.get('num_rounds', 'N/A'),
+        cfg.get('local_epochs', cfg.get('num_epochs', 'N/A')),
+        cfg.get('batch_size', 'N/A'),
+        cfg.get('lr', 'N/A'),
+        cfg.get('weight_decay', 'N/A'),
+        cfg.get('dropout', 'N/A'),
+        cfg.get('optim', 'N/A'),
+    ]
     
-    # Print the actual data row
-    data_row = "\t".join([
-        str(dataset),
-        str(scenario),
-        str(algorithm),
-        str(accuracy_reported),  # Empty - fill from paper
-        str(accuracy),
-        str(std_dev),
-        str(comm_cost),
-        str(time_seconds),
-        str(task),
-        str(model),
-        str(simulation_mode),
-        str(num_clients),
-        str(dirichlet_alpha),
-        str(num_rounds),
-        str(local_epochs),
-        str(batch_size),
-        str(lr),
-        str(weight_decay),
-        str(dropout),
-        str(optimizer)
-    ])
+    headers = [
+        "Dataset", "Scenario", "Algorithm", "Accuracy Reported",
+        "Test Acc", "Std Dev", "Val Acc", "Best Round",
+        "Comm (MB)", "Time (s)", "Task", "Model",
+        "Simulation Mode", "Num Clients", "Dirichlet Alpha",
+        "Num Rounds", "Local Epochs", "Batch Size",
+        "LR", "Weight Decay", "Dropout", "Optimizer"
+    ]
     
-    print("\n>>> COPY THIS LINE TO GOOGLE SHEETS <<<")
-    print(data_row)
-    print("="*100 + "\n")
+    print("\n" + "=" * 100)
+    print("GOOGLE SHEETS FORMAT")
+    print("=" * 100)
+    print("\nHeaders:")
+    print("\t".join(headers))
+    print("\n>>> COPY THIS LINE <<<")
+    print("\t".join(str(f) for f in fields))
+    print("=" * 100 + "\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run OpenFGL experiments from config files')
-    parser.add_argument('--config', type=str, required=True, 
+    parser.add_argument('--config', type=str, required=True,
                         help='Path to experiment config file (YAML)')
     parser.add_argument('--seeds', type=int, nargs='+', default=None,
                         help='Random seeds to use (overrides config file)')
@@ -295,26 +345,24 @@ if __name__ == "__main__":
     # Load configuration
     exp_config = load_config(args.config)
     
-    # Get seeds from command line or config file
-    if args.seeds is not None:
-        seeds = args.seeds
-    else:
-        seeds = exp_config.get('seeds', [42])  # Default to [42] if not specified
+    # Get seeds
+    seeds = args.seeds if args.seeds is not None else exp_config.get('seeds', [42])
     
     # Run experiments
     result = run_experiments(exp_config, seeds=seeds)
     
     # Print summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("EXPERIMENT SUMMARY")
-    print("="*70)
-    print(f"{'Experiment':<30} {'Accuracy (%)':<20} {'Time (s)':<20} {'Comm (MB)':<20}")
-    print("-"*70)
+    print("=" * 70)
+    print(f"{'Experiment':<30} {'Test Acc (%)':<15} {'Val Acc (%)':<15} {'Best Rnd':<10} {'Time (s)':<15} {'Comm (MB)':<15}")
+    print("-" * 100)
     print(f"{result['name']:<30} "
-          f"{result['mean_metric']:.2f}±{result['std_metric']:.2f}        "
-          f"{result['mean_time']:.2f}±{result['std_time']:.2f}        "
+          f"{result['mean_metric']:.2f}±{result['std_metric']:.2f}      "
+          f"{result['mean_val_metric']:.2f}±{result['std_val_metric']:.2f}      "
+          f"{result['mean_best_round']:.0f}±{result['std_best_round']:.0f}       "
+          f"{result['mean_time']:.2f}±{result['std_time']:.2f}      "
           f"{result['mean_comm']:.2f}±{result['std_comm']:.2f}")
-    print("="*70)
+    print("=" * 70)
     
-    # Print Google Sheets format
     print_google_sheets_format(result)

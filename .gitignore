@@ -25,3 +25,9 @@ logs/
 logs_*/
 logs_reproduce/
 slurm_job_outputs_gpu/
+slurm_job_outputs_barbun/dataset/distrib/
+data/
+*.DS_Store
+logs_reproduce/
+dataset/
+**/.DS_Store

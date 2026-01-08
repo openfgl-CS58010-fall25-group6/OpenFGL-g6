@@ -17,7 +17,13 @@ supported_graph_fl_task = ["graph_cls", "graph_reg"]
 supported_subgraph_fl_task = ["node_cls", "link_pred", "node_clust"]
 
 
-supported_fl_algorithm = ["isolate", "fedavg", "fedprox", "scaffold", "moon", "feddc", "fedproto", "fedtgp", "fedpub", "fedstar", "fedgta", "fedtad", "gcfl_plus", "fedsage_plus", "adafgl", "feddep", "fggp", "fgssl", "fedgl"]
+# === UPDATED: Added fedala_plus ===
+supported_fl_algorithm = [
+    "isolate", "fedavg", "fedprox", "scaffold", "moon", "feddc", 
+    "fedproto", "fedtgp", "fedpub", "fedstar", "fedgta", "fedtad", 
+    "gcfl_plus", "fedsage_plus", "adafgl", "feddep", "fggp", "fgssl", 
+    "fedgl", "fedala", "fedala_plus", "fedalarc"
+]
 
 
 supported_metrics = ["accuracy", "precision", "f1", "recall", "auc", "ap", "clustering_accuracy", "nmi", "ari"]
@@ -109,6 +115,37 @@ parser.add_argument("--log_name", type=str, default=None)
 parser.add_argument("--comm_cost", type=bool, default=False)
 parser.add_argument("--model_param", type=bool, default=False)
 
+# === FedALA & FedALA+ Hyperparameters ===
+# Original FedALA parameters (you already have these)
+parser.add_argument("--eta", type=float, default=1.0, help="Learning rate for ALA weights")
+parser.add_argument("--layer_idx", type=int, default=1, help="Number of lower layers to freeze in ALA (0 = adapt all)")
+parser.add_argument("--rand_percent", type=int, default=80, help="Percentage of data for ALA")
 
+parser.add_argument("--lambda_graph", type=float, default=0.0, 
+                    help="Graph regularization strength (0=disabled)")
+parser.add_argument("--graph_reg_type", type=str, default="laplacian",
+                    choices=["laplacian", "dirichlet"],
+                    help="Type of graph regularization")
+# === ADDED: Additional FedALA parameters ===
+parser.add_argument("--threshold", type=float, default=0.1, help="Convergence threshold for ALA")
+parser.add_argument("--num_pre_loss", type=int, default=10, help="Window size for convergence check")
+
+# === ADDED: FedALA+ disagreement sampling parameters ===
+parser.add_argument("--use_disagreement", type=bool, default=False, help="Use disagreement-based sampling in FedALA+")
+parser.add_argument("--selection_frequency", type=int, default=1, help="Recompute disagreement every N rounds")
+parser.add_argument("--min_disagreement_samples", type=int, default=None, help="Minimum disagreement samples before fallback to random")
+
+# === ADDED: FedALARC Byzantine & ARC parameters ===
+parser.add_argument("--use_arc", type=bool, default=False, 
+                   help="Enable Adaptive Robust Clipping (ARC)")
+parser.add_argument("--max_byzantine", type=int, default=1, 
+                   help="Maximum number of Byzantine workers to tolerate")
+parser.add_argument("--byzantine_ids", type=int, default=[], action='append',
+                   help="List of Byzantine client IDs (e.g., --byzantine_ids 0 --byzantine_ids 2)")
+parser.add_argument("--attack_type", type=str, default="sign_flip",
+                   choices=["sign_flip", "gaussian_noise", "zero", "random"],
+                   help="Type of Byzantine attack")
+parser.add_argument("--attack_params", type=str, default="{}", 
+                   help="JSON string of attack parameters (e.g., '{\"noise_scale\": 10.0}')")
 
 args, unknown = parser.parse_known_args()

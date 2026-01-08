@@ -1,0 +1,14 @@
+fedala:
+  algorithms:
+    - FedALA
+  model: GIN
+
+  common:
+    num_clients: 10
+    rounds: 100
+    local_steps: 1
+    batch_size: 128
+    lr: 0.001
+    weight_decay: 0.0005
+    dropout: 0.5
+    optimizer: adam
